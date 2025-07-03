@@ -55,7 +55,9 @@ module.exports = {
     const staffRoleId = process.env.STAFF_ROLE_ID;
     const isStaff = interaction.member.roles.cache.has(staffRoleId);
 
+    // Lida com comandos de barra (/)
     if (interaction.isChatInputCommand()) {
+      // Lógica para o comando /ban
       if (interaction.commandName === "ban") {
         if (!interaction.inGuild()) {
           return await interaction.reply({
@@ -113,7 +115,9 @@ module.exports = {
 
         await interaction.showModal(modal);
         return;
-      } else {
+      }
+      // Lógica para outros comandos de barra
+      else {
         const command = interaction.client.commands.get(
           interaction.commandName
         );
@@ -149,7 +153,9 @@ module.exports = {
           }
         }
       }
-    } else if (interaction.isStringSelectMenu()) {
+    }
+    // Lida com interações de menu de seleção (dropdowns)
+    else if (interaction.isStringSelectMenu()) {
       if (interaction.customId === "ticket_select") {
         await interaction.deferReply({ ephemeral: true });
 
@@ -365,7 +371,9 @@ module.exports = {
           });
         }
       }
-    } else if (interaction.isButton()) {
+    }
+    // Lida com interações de botão
+    else if (interaction.isButton()) {
       switch (interaction.customId) {
         case "close_ticket":
           let openerIdClose = null;
@@ -410,7 +418,7 @@ module.exports = {
             const firstActionRow = new ActionRowBuilder().addComponents(
               initialMessageInput
             );
-            modal.addComponents(firstRow);
+            modal.addComponents(firstActionRow);
             await interaction.showModal(modal);
           } else {
             await interaction.reply({
@@ -442,13 +450,9 @@ module.exports = {
                 "Ex: O usuário foi orientado a reabrir se o problema persistir."
               );
 
-            const firstActionRow = new ActionRowBuilder().addComponents(
-              reasonInput
-            );
-            const secondActionRow = new ActionRowBuilder().addComponents(
-              descriptionInput
-            );
-            modal.addComponents(firstActionRow, secondActionRow);
+            const row1 = new ActionRowBuilder().addComponents(reasonInput);
+            const row2 = new ActionRowBuilder().addComponents(descriptionInput);
+            modal.addComponents(row1, row2);
 
             await interaction.showModal(modal);
           } else {
@@ -625,7 +629,7 @@ module.exports = {
             const permissionOverwritesForCall = [];
 
             permissionOverwritesForCall.push({
-              id: guild.id,
+              id: guild.id, // @everyone
               deny: [
                 PermissionsBitField.Flags.ViewChannel,
                 PermissionsBitField.Flags.Connect,
@@ -963,8 +967,7 @@ module.exports = {
             });
           } else {
             await interaction.reply({
-              content:
-                "Não foi possível chamar o membro. Verifique o ID ou permissões do bot.",
+              content: `⚠️ Erro ao enviar a DM de notificação para ${targetMember.user.tag}.`,
               ephemeral: true,
             });
           }
@@ -1111,6 +1114,7 @@ module.exports = {
 
           let ticketOpenerId = null;
           let ticketNumber = "N/A";
+          let ticketType = "N/A";
           try {
             const topicData = JSON.parse(currentChannel.topic || "{}");
             ticketOpenerId = topicData.userId;
@@ -1118,6 +1122,7 @@ module.exports = {
               4,
               "0"
             );
+            ticketType = topicData.ticketType || "N/A";
           } catch (e) {
             console.error(
               `[${new Date().toLocaleString("pt-BR", {
@@ -1135,6 +1140,225 @@ module.exports = {
 
           await interaction.deferReply({ ephemeral: true });
 
+          // --- INÍCIO DA LÓGICA DE TRANSCRIÇÃO ---
+          const TICKET_LOGS_CHANNEL_ID = process.env.TICKET_LOGS_CHANNEL_ID;
+          console.log(
+            `[${new Date().toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+            })}] Verificando TICKET_LOGS_CHANNEL_ID: ${TICKET_LOGS_CHANNEL_ID}`
+          ); // LOG 1
+
+          if (!TICKET_LOGS_CHANNEL_ID) {
+            console.error(
+              `[${new Date().toLocaleString("pt-BR", {
+                timeZone: "America/Sao_Paulo",
+              })}] ERRO CRÍTICO: TICKET_LOGS_CHANNEL_ID não configurado no .env! Não é possível gerar logs.`
+            );
+            await interaction.followUp({
+              content:
+                "Erro: O canal de logs de tickets não está configurado. Por favor, avise um administrador.",
+              ephemeral: true,
+            });
+          } else {
+            try {
+              console.log(
+                `[${new Date().toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}] Tentando buscar mensagens do canal ${currentChannel.id}...`
+              ); // LOG 2
+              const messages = await currentChannel.messages.fetch({
+                limit: 100,
+              });
+              const sortedMessages = messages.sort(
+                (a, b) => a.createdTimestamp - b.createdTimestamp
+              );
+              console.log(
+                `[${new Date().toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}] ${sortedMessages.size} mensagens encontradas.`
+              ); // LOG 3
+
+              let transcriptContent = `--- Transcrição do Ticket #${ticketNumber} (${ticketType}) ---\n`;
+              transcriptContent += `Canal: #${currentChannel.name}\n`;
+              transcriptContent += `Criado por: ${
+                ticketOpenerId
+                  ? (
+                      await interaction.client.users
+                        .fetch(ticketOpenerId)
+                        .catch(() => ({
+                          tag: "Desconhecido",
+                          id: ticketOpenerId,
+                        }))
+                    ).tag
+                  : "Desconhecido"
+              }\n`;
+              transcriptContent += `Finalizado por: ${staffMember.user.tag}\n`;
+              transcriptContent += `Motivo da Finalização: ${finalizationReason}\n`;
+              if (finalizationDescription) {
+                transcriptContent += `Descrição Adicional: ${finalizationDescription}\n`;
+              }
+              transcriptContent += `Data de Finalização: ${new Date().toLocaleString(
+                "pt-BR",
+                { timeZone: "America/Sao_Paulo" }
+              )}\n`;
+              transcriptContent += `------------------------------------------------------\n\n`;
+
+              for (const message of sortedMessages.values()) {
+                const timestamp = message.createdAt.toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                });
+                const author = message.author.tag;
+                const content = message.content || "[Mensagem sem texto]";
+                const attachments = message.attachments
+                  .map((att) => att.url)
+                  .join("\n");
+
+                transcriptContent += `[${timestamp}] ${author}: ${content}\n`;
+                if (attachments) {
+                  transcriptContent += `[Anexos]:\n${attachments}\n`;
+                }
+                transcriptContent += `\n`;
+              }
+              console.log(
+                `[${new Date().toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}] Conteúdo da transcrição formatado.`
+              ); // LOG 4
+
+              const fileName = `ticket-${ticketNumber}-${currentChannel.name}.txt`;
+              const transcriptsDir = path.join(__dirname, "..", "transcripts");
+              const filePath = path.join(transcriptsDir, fileName);
+
+              if (!fs.existsSync(transcriptsDir)) {
+                console.log(
+                  `[${new Date().toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                  })}] Pasta 'transcripts' não existe. Tentando criar: ${transcriptsDir}`
+                ); // LOG 5
+                try {
+                  fs.mkdirSync(transcriptsDir, { recursive: true });
+                  console.log(
+                    `[${new Date().toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })}] Pasta 'transcripts' criada com sucesso.`
+                  ); // LOG 6
+                } catch (dirError) {
+                  console.error(
+                    `[${new Date().toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })}] ERRO: Não foi possível criar o diretório de transcrições ${transcriptsDir}:`,
+                    dirError
+                  );
+                  await interaction.followUp({
+                    content:
+                      "Erro: Não foi possível criar a pasta para salvar transcrições. Verifique as permissões do bot no sistema.",
+                    ephemeral: true,
+                  });
+                }
+              } else {
+                console.log(
+                  `[${new Date().toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                  })}] Pasta 'transcripts' já existe: ${transcriptsDir}`
+                ); // LOG 7
+              }
+
+              console.log(
+                `[${new Date().toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}] Tentando escrever arquivo de transcrição: ${filePath}`
+              ); // LOG 8
+              await fs.promises.writeFile(filePath, transcriptContent, "utf8");
+              console.log(
+                `[${new Date().toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}] Arquivo de transcrição escrito com sucesso.`
+              ); // LOG 9
+
+              const logsChannel = await interaction.guild.channels.fetch(
+                TICKET_LOGS_CHANNEL_ID
+              );
+              if (logsChannel && logsChannel.type === ChannelType.GuildText) {
+                console.log(
+                  `[${new Date().toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                  })}] Tentando enviar transcrição para o Discord.`
+                ); // LOG 10
+                const logEmbed = new EmbedBuilder()
+                  .setColor(0x008080)
+                  .setTitle(`📝 Transcrição do Ticket #${ticketNumber}`)
+                  .setDescription(
+                    `O ticket \`${currentChannel.name}\` foi finalizado e a transcrição está em anexo.`
+                  )
+                  .addFields(
+                    {
+                      name: "Criado por",
+                      value: ticketOpenerId
+                        ? `<@${ticketOpenerId}>`
+                        : "Desconhecido",
+                      inline: true,
+                    },
+                    {
+                      name: "Finalizado por",
+                      value: staffMember.user.tag,
+                      inline: true,
+                    },
+                    { name: "Motivo", value: finalizationReason, inline: false }
+                  )
+                  .setTimestamp();
+
+                await logsChannel.send({
+                  embeds: [logEmbed],
+                  files: [{ attachment: filePath, name: fileName }],
+                });
+                console.log(
+                  `[${new Date().toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                  })}] Transcrição do ticket #${ticketNumber} enviada para o canal de logs.`
+                ); // LOG 11
+              } else {
+                console.error(
+                  `[${new Date().toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                  })}] ERRO: Canal de logs de tickets (${TICKET_LOGS_CHANNEL_ID}) não encontrado ou não é um canal de texto válido. Não foi possível enviar a transcrição para o Discord.`
+                );
+                await interaction.followUp({
+                  content:
+                    "A transcrição foi gerada, mas não foi possível enviá-la para o canal de logs (canal inválido).",
+                  ephemeral: true,
+                });
+              }
+
+              fs.unlink(filePath, (err) => {
+                if (err)
+                  console.error(
+                    `[${new Date().toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })}] Erro ao deletar ficheiro de transcrição local:`,
+                    err
+                  );
+                else
+                  console.log(
+                    `[${new Date().toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })}] Ficheiro de transcrição local deletado.`
+                  );
+              });
+            } catch (transcriptError) {
+              console.error(
+                `[${new Date().toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}] ERRO GERAL no processo de transcrição do ticket:`,
+                transcriptError
+              );
+              await interaction.followUp({
+                content:
+                  "Houve um erro ao gerar a transcrição do ticket. Por favor, verifique os logs do bot.",
+                ephemeral: true,
+              });
+            }
+          }
+          // --- FIM DA LÓGICA DE TRANSCRIÇÃO ---
           if (ticketOpenerId) {
             try {
               const ticketOpener = await interaction.client.users.fetch(
@@ -1314,7 +1538,7 @@ module.exports = {
 
           const embed = new EmbedBuilder()
             .setColor(0xcd0000)
-            .setTitle("Notificação de Banimento/Advertência")
+            .setTitle("🚨 Notificação de Banimento/Advertência FiveM 🚨")
             .addFields(
               { name: "Nome In-game", value: nameInGame, inline: false },
               { name: "Discord", value: discordMentionValue, inline: false },
@@ -1335,9 +1559,9 @@ module.exports = {
             try {
               const dmEmbed = new EmbedBuilder()
                 .setColor(0xff0000)
-                .setTitle("Notificação de Banimento/Advertência")
+                .setTitle("🚨 Notificação de Banimento/Advertência 🚨")
                 .setDescription(
-                  `Você recebeu uma notificação de banimento/advertência no servidor **${interaction.guild.name}**.`
+                  `Você recebeu uma notificação de banimento/advertência no servidor **${interaction.guild.name}** referente à cidade FiveM.`
                 )
                 .addFields(
                   { name: "Nome In-game", value: nameInGame, inline: false },
