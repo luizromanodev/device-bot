@@ -11,6 +11,7 @@ const path = require("node:path");
 require("dotenv").config();
 
 const COUNTER_FILE = path.join(__dirname, "..", "counter.json");
+const TRANSCRIPTS_DIR = path.join(__dirname, "..", "transcripts");
 
 async function getTicketCounter() {
   try {
@@ -43,14 +44,12 @@ async function saveTicketCounter(count) {
   }
 }
 
-// Função para atualizar o timestamp de atividade do ticket
 async function updateTicketActivity(channel) {
   if (!channel || channel.type !== ChannelType.GuildText || !channel.topic)
     return;
 
   try {
     const topicData = JSON.parse(channel.topic);
-    // Atualiza lastActivity apenas se for um ticket gerido pelo bot e não estiver arquivado/fechado
     if (
       topicData.userId &&
       topicData.ticketType &&
@@ -64,11 +63,141 @@ async function updateTicketActivity(channel) {
   } catch (e) {}
 }
 
-// --- OBJETO ticketManager QUE CONTÉM AS FUNÇÕES EXPORTADAS ---
+async function sendRatingRequest(
+  client,
+  userId,
+  ticketNumber,
+  guildName,
+  channelName,
+  ticketChannelId,
+  ratingMessageId = null
+) {
+  const RATING_LOG_CHANNEL_ID = process.env.TICKET_RATING_LOG_CHANNEL_ID;
+  if (!RATING_LOG_CHANNEL_ID) {
+    console.error(
+      `[${new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      })}] TICKET_RATING_LOG_CHANNEL_ID não configurado no .env! Avaliações não serão logadas.`
+    );
+  }
+
+  try {
+    const user = await client.users.fetch(userId);
+    if (!user) {
+      console.warn(
+        `[${new Date().toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+        })}] Não foi possível encontrar o usuário para enviar a avaliação: ${userId}`
+      );
+      return null;
+    }
+
+    const ratingEmbed = new EmbedBuilder()
+      .setColor(0x0099ff)
+      .setTitle("✨ Avalie seu Atendimento!")
+      .setDescription(
+        `Seu ticket #${String(ticketNumber).padStart(
+          4,
+          "0"
+        )} em **${guildName}** (\`${channelName}\` <#${ticketChannelId}>) foi finalizado. Gostaríamos de saber sua opinião sobre o atendimento recebido.`
+      )
+      .addFields({
+        name: "Como você avaliaria o suporte?",
+        value:
+          "Clique em uma das estrelas abaixo para avaliar de 1 (Ruim) a 5 (Excelente).",
+      })
+      .setTimestamp()
+      .setFooter({ text: "Seu feedback é muito importante para nós!" });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          `rate_ticket_${ticketNumber}_${userId}_${ticketChannelId}_1`
+        )
+        .setLabel("⭐")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(
+          `rate_ticket_${ticketNumber}_${userId}_${ticketChannelId}_2`
+        )
+        .setLabel("⭐⭐")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(
+          `rate_ticket_${ticketNumber}_${userId}_${ticketChannelId}_3`
+        )
+        .setLabel("⭐⭐⭐")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(
+          `rate_ticket_${ticketNumber}_${userId}_${ticketChannelId}_4`
+        )
+        .setLabel("⭐⭐⭐⭐")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(
+          `rate_ticket_${ticketNumber}_${userId}_${ticketChannelId}_5`
+        )
+        .setLabel("⭐⭐⭐⭐⭐")
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    let message;
+    if (ratingMessageId) {
+      const oldMessage = await user.dmChannel.messages
+        .fetch(ratingMessageId)
+        .catch(() => null);
+      if (oldMessage) {
+        message = await oldMessage.edit({
+          embeds: [ratingEmbed],
+          components: [row],
+        });
+        console.log(
+          `[${new Date().toLocaleString("pt-BR", {
+            timeZone: "America/Sao_Paulo",
+          })}] Solicitação de avaliação atualizada para ${
+            user.tag
+          } (Ticket #${ticketNumber}).`
+        );
+      } else {
+        message = await user.send({ embeds: [ratingEmbed], components: [row] });
+        console.log(
+          `[${new Date().toLocaleString("pt-BR", {
+            timeZone: "America/Sao_Paulo",
+          })}] Solicitação de avaliação enviada (nova) para ${
+            user.tag
+          } (Ticket #${ticketNumber}).`
+        );
+      }
+    } else {
+      message = await user.send({ embeds: [ratingEmbed], components: [row] });
+      console.log(
+        `[${new Date().toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+        })}] Solicitação de avaliação enviada para ${
+          user.tag
+        } (Ticket #${ticketNumber}).`
+      );
+    }
+
+    return message.id;
+  } catch (error) {
+    console.error(
+      `[${new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      })}] Erro ao enviar solicitação de avaliação para ${userId} (Ticket #${ticketNumber}):`,
+      error
+    );
+    return null;
+  }
+}
+
 const ticketManager = {
   updateTicketActivity: updateTicketActivity,
+  getTicketCounter: getTicketCounter,
+  saveTicketCounter: saveTicketCounter,
+  sendRatingRequest: sendRatingRequest,
   checkInactiveTickets: async function (client) {
-    // Implementação da função de auto-fechamento
     const WARN_HOURS = parseInt(
       process.env.TICKET_INACTIVITY_WARN_HOURS || "20",
       10
@@ -79,6 +208,8 @@ const ticketManager = {
     );
     const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID;
     const TICKET_LOGS_CHANNEL_ID = process.env.TICKET_LOGS_CHANNEL_ID;
+    const TICKET_RATING_LOG_CHANNEL_ID =
+      process.env.TICKET_RATING_LOG_CHANNEL_ID;
 
     if (!STAFF_ROLE_ID || !TICKET_LOGS_CHANNEL_ID) {
       console.error(
@@ -127,7 +258,6 @@ const ticketManager = {
           continue;
         }
 
-        // Verifica se é um canal de ticket gerenciado pelo bot e não é um ticket já arquivado/fechado
         if (
           topicData.userId &&
           topicData.ticketType &&
@@ -145,7 +275,6 @@ const ticketManager = {
           );
           const ticketOpenerId = topicData.userId;
 
-          // Caso 1: Fechar por Inatividade
           if (inactivityDurationHours >= CLOSE_HOURS) {
             console.log(
               `[${new Date().toLocaleString("pt-BR", {
@@ -158,11 +287,9 @@ const ticketManager = {
             try {
               const finalizationReason = `Fechado automaticamente por inatividade (${CLOSE_HOURS} horas).`;
               const finalizationDescription = `Não houve atividade neste ticket por mais de ${CLOSE_HOURS} horas.`;
-              const staffBotUser = client.user; // O próprio bot é o "staff" que finaliza
+              const staffBotUser = client.user;
 
-              // Lógica de Transcrição para auto-fechamento
               if (logsChannel) {
-                // Verifica se o canal de logs é válido antes de tentar enviar
                 try {
                   const messages = await channel.messages.fetch({ limit: 100 });
                   const sortedMessages = messages.sort(
@@ -190,6 +317,10 @@ const ticketManager = {
                   )}\n`;
                   transcriptContent += `------------------------------------------------------\n\n`;
 
+                  if (!fs.existsSync(TRANSCRIPTS_DIR)) {
+                    fs.mkdirSync(TRANSCRIPTS_DIR, { recursive: true });
+                  }
+
                   for (const message of sortedMessages.values()) {
                     const timestamp = message.createdAt.toLocaleString(
                       "pt-BR",
@@ -207,16 +338,8 @@ const ticketManager = {
                   }
 
                   const fileName = `ticket-${ticketNumber}-${channel.name}-auto-closed.txt`;
-                  const transcriptsDir = path.join(
-                    __dirname,
-                    "..",
-                    "transcripts"
-                  );
-                  const filePath = path.join(transcriptsDir, fileName);
+                  const filePath = path.join(TRANSCRIPTS_DIR, fileName);
 
-                  if (!fs.existsSync(transcriptsDir)) {
-                    fs.mkdirSync(transcriptsDir, { recursive: true });
-                  }
                   await fs.promises.writeFile(
                     filePath,
                     transcriptContent,
@@ -314,6 +437,16 @@ const ticketManager = {
                 }
               }
 
+              // Enviar solicitação de avaliação após auto-fechamento
+              await sendRatingRequest(
+                client,
+                ticketOpenerId,
+                topicData.ticketNumber,
+                guild.name,
+                channel.name,
+                channel.id
+              );
+
               await channel.send(
                 `🚫 Este ticket foi fechado automaticamente por inatividade (${CLOSE_HOURS} horas sem atividade).`
               );
@@ -380,4 +513,5 @@ const ticketManager = {
     }
   },
 };
+
 module.exports = ticketManager;
