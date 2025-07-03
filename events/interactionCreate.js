@@ -264,6 +264,9 @@ module.exports = {
               userId: member.id,
               ticketType: ticketType,
               ticketNumber: ticketNumber,
+              createdAt: Date.now(),
+              lastActivity: Date.now(),
+              warningSent: false,
             }),
             permissionOverwrites: [
               {
@@ -479,7 +482,7 @@ module.exports = {
             const dmTitleInput = new TextInputBuilder()
               .setCustomId("dm_title")
               .setLabel("Título da Mensagem Privada (DM)")
-              .setStyle(TextInputStyle.Short)
+              .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setPlaceholder("Ex: Chamado para Suporte - Ticket #XYZ");
 

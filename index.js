@@ -12,6 +12,11 @@ const path = require("node:path");
 const fs = require("node:fs");
 require("dotenv").config();
 
+const {
+  checkInactiveTickets,
+  updateTicketActivity,
+} = require("./utils/ticketManager");
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -21,14 +26,14 @@ const client = new Client({
   ],
 });
 
-client.commands = new Collection();
+client.commands = new Collection(); // Coleção para comandos de barra
 
+// Carregar comandos de barra
 const commandsPath = path.join(__dirname, "commands");
 try {
   const commandFiles = fs
     .readdirSync(commandsPath)
     .filter((file) => file.endsWith(".js"));
-
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
@@ -46,6 +51,7 @@ try {
   );
 }
 
+// Carregar eventos
 const eventsPath = path.join(__dirname, "events");
 const eventFiles = fs
   .readdirSync(eventsPath)
@@ -63,6 +69,7 @@ for (const file of eventFiles) {
 
 const PANEL_MESSAGE_ID_FILE = path.join(__dirname, "panel_message_id.json");
 
+// Função para ler o ID da mensagem do painel
 async function getPanelMessageId() {
   try {
     const data = await fs.promises.readFile(PANEL_MESSAGE_ID_FILE, "utf8");
@@ -72,6 +79,7 @@ async function getPanelMessageId() {
   }
 }
 
+// Função para salvar o ID da mensagem do painel
 async function savePanelMessageId(messageId) {
   try {
     await fs.promises.writeFile(
@@ -89,9 +97,45 @@ async function savePanelMessageId(messageId) {
   }
 }
 
+// Evento quando o bot está pronto
 client.once(Events.ClientReady, async (c) => {
   console.log(`Pronto! Logado como ${c.user.tag}`);
 
+  // Agendar verificação de tickets inativos
+  const checkIntervalMinutes = parseInt(
+    process.env.TICKET_INACTIVITY_CHECK_INTERVAL_MINUTES || "30",
+    10
+  );
+  if (checkIntervalMinutes > 0) {
+    // Chamar imediatamente na inicialização para pegar tickets antigos ou perdidos
+    console.log(
+      `[${new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      })}] Iniciando verificação inicial de tickets inativos.`
+    );
+    await checkInactiveTickets(client);
+    setInterval(() => {
+      console.log(
+        `[${new Date().toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+        })}] Executando verificação agendada de tickets inativos.`
+      );
+      checkInactiveTickets(client);
+    }, checkIntervalMinutes * 60 * 1000);
+    console.log(
+      `[${new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      })}] Verificação de tickets inativos agendada para cada ${checkIntervalMinutes} minutos.`
+    );
+  } else {
+    console.warn(
+      `[${new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      })}] TICKET_INACTIVITY_CHECK_INTERVAL_MINUTES está desativado (<= 0). Auto-fechamento de tickets inativos não será executado.`
+    );
+  }
+
+  // Gerenciar o painel de tickets automático
   const panelChannelId = process.env.TICKET_PANEL_CHANNEL_ID;
   if (!panelChannelId) {
     console.error(

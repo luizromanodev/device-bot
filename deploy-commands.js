@@ -5,6 +5,7 @@ require("dotenv").config();
 
 const commands = [];
 
+// Carregar comandos de barra da pasta 'commands'
 const commandsPath = path.join(__dirname, "commands");
 try {
   const commandFiles = fs
