@@ -9,6 +9,7 @@ const {
 const fs = require("node:fs");
 const path = require("node:path");
 require("dotenv").config();
+const { logInfo, logWarn, logError } = require("./logger");
 
 const COUNTER_FILE = path.join(__dirname, "..", "counter.json");
 const TRANSCRIPTS_DIR = path.join(__dirname, "..", "transcripts");
@@ -19,12 +20,7 @@ async function getTicketCounter() {
     const counter = JSON.parse(data);
     return counter.ticketCounter;
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao ler counter.json (ticketManager):`,
-      error.message
-    );
+    logError(`Erro ao ler counter.json (ticketManager):`, error);
     await saveTicketCounter(0);
     return 0;
   }
@@ -35,12 +31,7 @@ async function saveTicketCounter(count) {
     const data = JSON.stringify({ ticketCounter: count }, null, 2);
     await fs.promises.writeFile(COUNTER_FILE, data, "utf8");
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao salvar counter.json (ticketManager):`,
-      error.message
-    );
+    logError(`Erro ao salvar counter.json (ticketManager):`, error);
   }
 }
 
@@ -60,7 +51,11 @@ async function updateTicketActivity(channel) {
       topicData.warningSent = false;
       await channel.setTopic(JSON.stringify(topicData));
     }
-  } catch (e) {}
+  } catch (e) {
+    logWarn(
+      `Erro ao atualizar a atividade do ticket no tópico do canal (${channel.id}): ${e.message}`
+    );
+  }
 }
 
 async function sendRatingRequest(
@@ -74,20 +69,16 @@ async function sendRatingRequest(
 ) {
   const RATING_LOG_CHANNEL_ID = process.env.TICKET_RATING_LOG_CHANNEL_ID;
   if (!RATING_LOG_CHANNEL_ID) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] TICKET_RATING_LOG_CHANNEL_ID não configurado no .env! Avaliações não serão logadas.`
+    logError(
+      `TICKET_RATING_LOG_CHANNEL_ID não configurado no .env! Avaliações não serão logadas.`
     );
   }
 
   try {
-    const user = await client.users.fetch(userId);
+    const user = await client.users.fetch(userId).catch(() => null);
     if (!user) {
-      console.warn(
-        `[${new Date().toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
-        })}] Não foi possível encontrar o usuário para enviar a avaliação: ${userId}`
+      logWarn(
+        `Não foi possível encontrar o usuário para enviar a avaliação: ${userId}`
       );
       return null;
     }
@@ -152,40 +143,26 @@ async function sendRatingRequest(
           embeds: [ratingEmbed],
           components: [row],
         });
-        console.log(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Solicitação de avaliação atualizada para ${
-            user.tag
-          } (Ticket #${ticketNumber}).`
+        logInfo(
+          `Solicitação de avaliação atualizada para ${user.tag} (Ticket #${ticketNumber}).`
         );
       } else {
         message = await user.send({ embeds: [ratingEmbed], components: [row] });
-        console.log(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Solicitação de avaliação enviada (nova) para ${
-            user.tag
-          } (Ticket #${ticketNumber}).`
+        logInfo(
+          `Solicitação de avaliação enviada (nova) para ${user.tag} (Ticket #${ticketNumber}).`
         );
       }
     } else {
       message = await user.send({ embeds: [ratingEmbed], components: [row] });
-      console.log(
-        `[${new Date().toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
-        })}] Solicitação de avaliação enviada para ${
-          user.tag
-        } (Ticket #${ticketNumber}).`
+      logInfo(
+        `Solicitação de avaliação enviada para ${user.tag} (Ticket #${ticketNumber}).`
       );
     }
 
     return message.id;
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao enviar solicitação de avaliação para ${userId} (Ticket #${ticketNumber}):`,
+    logError(
+      `Erro ao enviar solicitação de avaliação para ${userId} (Ticket #${ticketNumber}):`,
       error
     );
     return null;
@@ -208,14 +185,10 @@ const ticketManager = {
     );
     const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID;
     const TICKET_LOGS_CHANNEL_ID = process.env.TICKET_LOGS_CHANNEL_ID;
-    const TICKET_RATING_LOG_CHANNEL_ID =
-      process.env.TICKET_RATING_LOG_CHANNEL_ID;
 
     if (!STAFF_ROLE_ID || !TICKET_LOGS_CHANNEL_ID) {
-      console.error(
-        `[${new Date().toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
-        })}] Erro de configuração para auto-fechamento: STAFF_ROLE_ID ou TICKET_LOGS_CHANNEL_ID não definidos.`
+      logError(
+        `Erro de configuração para auto-fechamento: STAFF_ROLE_ID ou TICKET_LOGS_CHANNEL_ID não definidos.`
       );
       return;
     }
@@ -225,12 +198,8 @@ const ticketManager = {
         .fetch(STAFF_ROLE_ID)
         .catch(() => null);
       if (!staffRole) {
-        console.error(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Cargo da staff (${STAFF_ROLE_ID}) não encontrado na guilda ${
-            guild.name
-          }.`
+        logError(
+          `Cargo da staff (${STAFF_ROLE_ID}) não encontrado na guilda ${guild.name}.`
         );
         continue;
       }
@@ -239,12 +208,8 @@ const ticketManager = {
         .fetch(TICKET_LOGS_CHANNEL_ID)
         .catch(() => null);
       if (!logsChannel || logsChannel.type !== ChannelType.GuildText) {
-        console.error(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Canal de logs (${TICKET_LOGS_CHANNEL_ID}) não encontrado ou não é um canal de texto na guilda ${
-            guild.name
-          }.`
+        logError(
+          `Canal de logs (${TICKET_LOGS_CHANNEL_ID}) não encontrado ou não é um canal de texto na guilda ${guild.name}.`
         );
       }
 
@@ -276,10 +241,8 @@ const ticketManager = {
           const ticketOpenerId = topicData.userId;
 
           if (inactivityDurationHours >= CLOSE_HOURS) {
-            console.log(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Fechando ticket #${ticketNumber} (${
+            logInfo(
+              `Fechando ticket #${ticketNumber} (${
                 channel.name
               }) por inatividade (${inactivityDurationHours.toFixed(2)} horas).`
             );
@@ -379,18 +342,14 @@ const ticketManager = {
 
                   fs.unlink(filePath, (err) => {
                     if (err)
-                      console.error(
-                        `[${new Date().toLocaleString("pt-BR", {
-                          timeZone: "America/Sao_Paulo",
-                        })}] Erro ao deletar ficheiro de transcrição local (auto-close):`,
+                      logError(
+                        `Erro ao deletar ficheiro de transcrição local (auto-close):`,
                         err
                       );
                   });
                 } catch (transcriptError) {
-                  console.error(
-                    `[${new Date().toLocaleString("pt-BR", {
-                      timeZone: "America/Sao_Paulo",
-                    })}] Erro ao gerar transcrição para ticket auto-fechado #${ticketNumber}:`,
+                  logError(
+                    `Erro ao gerar transcrição para ticket auto-fechado #${ticketNumber}:`,
                     transcriptError
                   );
                 }
@@ -399,7 +358,9 @@ const ticketManager = {
               // Enviar DM ao criador do ticket
               if (ticketOpenerId) {
                 try {
-                  const ticketOpener = await client.users.fetch(ticketOpenerId);
+                  const ticketOpener = await client.users
+                    .fetch(ticketOpenerId)
+                    .catch(() => null);
                   if (ticketOpener) {
                     const dmEmbed = new EmbedBuilder()
                       .setColor(0xff4500)
@@ -428,10 +389,8 @@ const ticketManager = {
                     await ticketOpener.send({ embeds: [dmEmbed] });
                   }
                 } catch (dmError) {
-                  console.error(
-                    `[${new Date().toLocaleString("pt-BR", {
-                      timeZone: "America/Sao_Paulo",
-                    })}] Erro ao enviar DM de auto-fechamento para o usuário (${ticketOpenerId}):`,
+                  logError(
+                    `Erro ao enviar DM de auto-fechamento para o usuário (${ticketOpenerId}):`,
                     dmError
                   );
                 }
@@ -452,10 +411,8 @@ const ticketManager = {
               );
               await channel.delete("Ticket fechado por inatividade.");
             } catch (closeError) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Erro ao fechar ticket #${ticketNumber} automaticamente:`,
+              logError(
+                `Erro ao fechar ticket #${ticketNumber} automaticamente:`,
                 closeError
               );
             }
@@ -465,10 +422,8 @@ const ticketManager = {
             inactivityDurationHours >= WARN_HOURS &&
             !topicData.warningSent
           ) {
-            console.log(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Enviando aviso de inatividade para ticket #${ticketNumber} (${inactivityDurationHours.toFixed(
+            logInfo(
+              `Enviando aviso de inatividade para ticket #${ticketNumber} (${inactivityDurationHours.toFixed(
                 2
               )} horas).`
             );
@@ -500,10 +455,8 @@ const ticketManager = {
               topicData.warningSent = true;
               await channel.setTopic(JSON.stringify(topicData));
             } catch (warnError) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Erro ao enviar aviso de inatividade para ticket #${ticketNumber}:`,
+              logError(
+                `Erro ao enviar aviso de inatividade para ticket #${ticketNumber}:`,
                 warnError
               );
             }

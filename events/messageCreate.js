@@ -1,10 +1,11 @@
-const { Events } = require("discord.js");
+const { Events, ChannelType } = require("discord.js");
 const { updateTicketActivity } = require("../utils/ticketManager");
 const {
   checkMessageForBlacklistedWords,
   checkMessageForInvites,
   checkMessageForSpam,
 } = require("../utils/autoModManager");
+const { logError } = require("../utils/logger");
 
 module.exports = {
   name: Events.MessageCreate,
@@ -33,17 +34,14 @@ module.exports = {
           return;
         }
       } catch (error) {
-        console.error(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Erro na auto-moderação: ${error.stack}`
-        );
+        logError(`Erro na auto-moderação:`, error);
       }
     }
 
-    // atualização de atividade de tickets
-    if (message.channel.type === 0 && message.channel.topic) {
-      // ChannelType.GuildText
+    if (
+      message.channel.type === ChannelType.GuildText &&
+      message.channel.topic
+    ) {
       await updateTicketActivity(message.channel);
     }
   },

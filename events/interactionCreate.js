@@ -16,6 +16,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 require("dotenv").config();
 
+const { logInfo, logWarn, logError } = require("../utils/logger");
+
 const { sendRatingRequest } = require("../utils/ticketManager");
 
 const COUNTER_FILE = path.join(__dirname, "..", "counter.json");
@@ -26,12 +28,7 @@ async function getTicketCounter() {
     const counter = JSON.parse(data);
     return counter.ticketCounter;
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao ler counter.json, iniciando contador em 0:`,
-      error.message
-    );
+    logError(`Erro ao ler counter.json, iniciando contador em 0:`, error);
     await saveTicketCounter(0);
     return 0;
   }
@@ -42,12 +39,7 @@ async function saveTicketCounter(count) {
     const data = JSON.stringify({ ticketCounter: count }, null, 2);
     await fs.promises.writeFile(COUNTER_FILE, data, "utf8");
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao salvar counter.json:`,
-      error.message
-    );
+    logError(`Erro ao salvar counter.json:`, error);
   }
 }
 
@@ -58,9 +50,9 @@ module.exports = {
     const isStaff =
       interaction.inGuild() && interaction.member.roles.cache.has(staffRoleId);
 
-    // Lida com comandos de barra (/)
+    // comandos de barra (/)
     if (interaction.isChatInputCommand()) {
-      // Lógica para o comando /ban
+      // comando /ban
       if (interaction.commandName === "ban") {
         if (!interaction.inGuild()) {
           return await interaction.reply({
@@ -119,30 +111,24 @@ module.exports = {
         await interaction.showModal(modal);
         return;
       }
-      // Lógica para outros comandos de barra
+      // outros comandos de barra
       else {
         const command = interaction.client.commands.get(
           interaction.commandName
         );
         if (!command) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Nenhum comando correspondente a ${
-              interaction.commandName
-            } foi encontrado.`
+          logError(
+            `Nenhum comando correspondente a ${interaction.commandName} foi encontrado.`
           );
           return;
         }
         try {
           await command.execute(interaction);
         } catch (error) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao executar o comando ${interaction.commandName}`
+          logError(
+            `Erro ao executar o comando ${interaction.commandName}`,
+            error
           );
-          console.error(error);
           if (interaction.replied || interaction.deferred) {
             await interaction.followUp({
               content: "Houve um erro ao executar este comando!",
@@ -157,7 +143,7 @@ module.exports = {
         }
       }
     }
-    // Lida com interações de menu de seleção (dropdowns)
+    // dropdowns
     else if (interaction.isStringSelectMenu()) {
       if (interaction.customId === "ticket_select") {
         await interaction.deferReply({ ephemeral: true });
@@ -190,11 +176,7 @@ module.exports = {
             targetCategoryId = process.env.CATEGORY_OUTROS_ID;
             break;
           default:
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Tipo de ticket desconhecido: ${ticketType}`
-            );
+            logError(`Tipo de ticket desconhecido: ${ticketType}`);
             await interaction.editReply({
               content:
                 "Erro: Tipo de ticket inválido selecionado. Por favor, tente novamente.",
@@ -210,10 +192,8 @@ module.exports = {
           !categoryExists ||
           categoryExists.type !== ChannelType.GuildCategory
         ) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Categoria ID inválida ou não encontrada para ${ticketType}: ${targetCategoryId}`
+          logError(
+            `Categoria ID inválida ou não encontrada para ${ticketType}: ${targetCategoryId}`
           );
           await interaction.editReply({
             content:
@@ -364,12 +344,7 @@ module.exports = {
             ephemeral: true,
           });
         } catch (error) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao criar o canal do ticket:`,
-            error
-          );
+          logError(`Erro ao criar o canal do ticket:`, error);
           await interaction.editReply({
             content:
               "Houve um erro ao abrir seu ticket. Tente novamente mais tarde.",
@@ -378,7 +353,7 @@ module.exports = {
         }
       }
     }
-    // Lida com interações de botão
+    // interações de botão
     else if (interaction.isButton()) {
       switch (interaction.customId) {
         case "close_ticket":
@@ -387,7 +362,11 @@ module.exports = {
             openerIdClose = JSON.parse(
               interaction.channel.topic || "{}"
             ).userId;
-          } catch (e) {}
+          } catch (e) {
+            logWarn(
+              `Erro ao parsear tópico do canal ao fechar ticket: ${e.message}`
+            );
+          }
 
           if (interaction.member.id === openerIdClose) {
             await interaction.reply({
@@ -609,7 +588,9 @@ module.exports = {
           try {
             const currentChannel = interaction.channel;
             const guild = interaction.guild;
-            const staffRole = await guild.roles.fetch(staffRoleId);
+            const staffRole = await guild.roles
+              .fetch(staffRoleId)
+              .catch(() => null);
             const member = interaction.member;
 
             let ticketOpenerId = null;
@@ -624,12 +605,7 @@ module.exports = {
               );
               ticketType = topicData.ticketType || "N/A";
             } catch (e) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Erro ao parsear tópico do canal ao criar call:`,
-                e
-              );
+              logError(`Erro ao parsear tópico do canal ao criar call:`, e);
             }
 
             const permissionOverwritesForCall = [];
@@ -730,6 +706,7 @@ module.exports = {
             );
 
             await currentChannel.send({
+              content: `<@${member.id}> <@&${staffRoleId}>`,
               embeds: [callEmbed],
               components: [callButtonRow],
             });
@@ -738,12 +715,7 @@ module.exports = {
               ephemeral: true,
             });
           } catch (error) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Erro ao criar a call para o ticket:`,
-              error
-            );
+            logError(`Erro ao criar a call para o ticket:`, error);
             await interaction.editReply({
               content:
                 "Houve um erro ao criar a call. Verifique as permissões do bot ou tente novamente.",
@@ -777,12 +749,7 @@ module.exports = {
               ephemeral: true,
             });
           } catch (error) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Erro ao deletar call:`,
-              error
-            );
+            logError(`Erro ao deletar call:`, error);
             await interaction.followUp({
               content:
                 "Houve um erro ao deletar a call. Verifique as permissões do bot.",
@@ -796,10 +763,8 @@ module.exports = {
           });
         }
       } else if (interaction.customId.startsWith("rate_ticket_")) {
-        console.log(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Botão de avaliação clicado! Custom ID: ${interaction.customId}`
+        logInfo(
+          `Botão de avaliação clicado! Custom ID: ${interaction.customId}`
         );
         await interaction.deferUpdate();
 
@@ -810,12 +775,8 @@ module.exports = {
             parts[0] !== "rate" ||
             parts[1] !== "ticket"
           ) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Custom ID de avaliação inválido ou mal formatado: ${
-                interaction.customId
-              }`
+            logError(
+              `Custom ID de avaliação inválido ou mal formatado: ${interaction.customId}`
             );
             await interaction.followUp({
               content:
@@ -831,12 +792,8 @@ module.exports = {
           const rating = parseInt(parts[5]);
 
           if (isNaN(rating) || rating < 1 || rating > 5) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Avaliação inválida no Custom ID: ${
-                interaction.customId
-              }. Rating: ${rating}`
+            logError(
+              `Avaliação inválida no Custom ID: ${interaction.customId}. Rating: ${rating}`
             );
             await interaction.followUp({
               content: "Erro: Avaliação inválida. Por favor, tente novamente.",
@@ -857,10 +814,8 @@ module.exports = {
           const RATING_LOG_CHANNEL_ID =
             process.env.TICKET_RATING_LOG_CHANNEL_ID;
           if (!RATING_LOG_CHANNEL_ID) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] TICKET_RATING_LOG_CHANNEL_ID não configurado no .env! Avaliações não serão logadas.`
+            logError(
+              `TICKET_RATING_LOG_CHANNEL_ID não configurado no .env! Avaliações não serão logadas.`
             );
             await interaction.followUp({
               content:
@@ -869,17 +824,15 @@ module.exports = {
             });
           } else {
             try {
-              const ratingLogChannel = await interaction.client.channels.fetch(
-                RATING_LOG_CHANNEL_ID
-              );
+              const ratingLogChannel = await interaction.client.channels
+                .fetch(RATING_LOG_CHANNEL_ID)
+                .catch(() => null); // Adicionado .catch
               if (
                 !ratingLogChannel ||
                 ratingLogChannel.type !== ChannelType.GuildText
               ) {
-                console.error(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Canal de logs de avaliação (${RATING_LOG_CHANNEL_ID}) inválido ou não é um canal de texto.`
+                logError(
+                  `Canal de logs de avaliação (${RATING_LOG_CHANNEL_ID}) inválido ou não é um canal de texto.`
                 );
                 await interaction.followUp({
                   content:
@@ -916,17 +869,13 @@ module.exports = {
                   });
 
                 await ratingLogChannel.send({ embeds: [ratingLogEmbed] });
-                console.log(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Avaliação de ticket #${ticketNumber} (${rating} estrelas) logada.`
+                logInfo(
+                  `Avaliação de ticket #${ticketNumber} (${rating} estrelas) logada.`
                 );
               }
             } catch (logChannelError) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Erro ao enviar log de avaliação para o canal de logs:`,
+              logError(
+                `Erro ao enviar log de avaliação para o canal de logs:`,
                 logChannelError
               );
             }
@@ -939,21 +888,43 @@ module.exports = {
             button.setDisabled(true);
           }
 
-          const dmChannel = await interaction.user.createDM();
-          const originalRatingMessage = await dmChannel.messages
-            .fetch(interaction.message.id)
-            .catch(() => null);
-          if (originalRatingMessage) {
-            await originalRatingMessage
-              .edit({ components: [updatedRow] })
-              .catch((editErr) => {
-                console.error(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Erro ao editar mensagem de avaliação na DM:`,
-                  editErr
+          const dmChannel = await interaction.user.createDM().catch((e) => {
+            logError(
+              `Erro ao criar DM com o usuário ${interaction.user.tag} para desabilitar botões na avaliação:`,
+              e
+            );
+            return null;
+          });
+
+          if (dmChannel) {
+            const originalRatingMessage = await dmChannel.messages
+              .fetch(interaction.message.id)
+              .catch((e) => {
+                logError(
+                  `Erro ao buscar mensagem de avaliação na DM do usuário (${interaction.user.id}) para edição:`,
+                  e
                 );
+                return null;
               });
+
+            if (originalRatingMessage) {
+              await originalRatingMessage
+                .edit({ components: [updatedRow] })
+                .catch((editErr) => {
+                  logError(
+                    `Erro ao editar mensagem de avaliação na DM do usuário (${interaction.user.id}):`,
+                    editErr
+                  );
+                });
+            } else {
+              logWarn(
+                `Mensagem original de avaliação não encontrada na DM do usuário ${interaction.user.tag} (${interaction.user.id}).`
+              );
+            }
+          } else {
+            logWarn(
+              `Não foi possível enviar/editar a DM de avaliação para ${interaction.user.tag} (DM desativada ou outro erro).`
+            );
           }
 
           // Confirmação para o usuário na DM
@@ -962,17 +933,20 @@ module.exports = {
             ephemeral: true,
           });
         } catch (generalError) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] ERRO GERAL ao processar botão de avaliação:`,
-            generalError
-          );
-          await interaction.followUp({
-            content:
-              "Ocorreu um erro ao registrar sua avaliação. Por favor, tente novamente mais tarde.",
-            ephemeral: true,
-          });
+          logError(`ERRO GERAL ao processar botão de avaliação:`, generalError);
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({
+              content:
+                "Ocorreu um erro ao registrar sua avaliação. Por favor, tente novamente mais tarde.",
+              ephemeral: true,
+            });
+          } else {
+            await interaction.reply({
+              content:
+                "Ocorreu um erro ao registrar sua avaliação. Por favor, tente novamente.",
+              ephemeral: true,
+            });
+          }
         }
       }
     } else if (interaction.isModalSubmit()) {
@@ -996,12 +970,7 @@ module.exports = {
             "0"
           );
         } catch (e) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao parsear tópico do canal ao assumir ticket:`,
-            e
-          );
+          logError(`Erro ao parsear tópico do canal ao assumir ticket:`, e);
         }
 
         const claimedEmbed = new EmbedBuilder()
@@ -1034,9 +1003,9 @@ module.exports = {
 
         if (ticketOpenerId) {
           try {
-            const ticketOpener = await interaction.client.users.fetch(
-              ticketOpenerId
-            );
+            const ticketOpener = await interaction.client.users
+              .fetch(ticketOpenerId)
+              .catch(() => null); // Adicionado .catch
             if (ticketOpener) {
               const dmToOpenerEmbed = new EmbedBuilder()
                 .setColor(0x00ff7f)
@@ -1068,17 +1037,13 @@ module.exports = {
                 });
 
               await ticketOpener.send({ embeds: [dmToOpenerEmbed] });
-              console.log(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] DM de atendimento assumido enviada para ${user.tag}.`
+              logInfo(
+                `DM de atendimento assumido enviada para ${ticketOpener.tag}.`
               );
             }
           } catch (error) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Erro ao enviar DM de atendimento assumido para o usuário (${ticketOpenerId}):`,
+            logError(
+              `Erro ao enviar DM de atendimento assumido para o usuário (${ticketOpenerId}):`,
               error
             );
             if (error.code === 50007) {
@@ -1101,7 +1066,9 @@ module.exports = {
         const staffMember = interaction.member;
 
         try {
-          const targetMember = await interaction.guild.members.fetch(memberId);
+          const targetMember = await interaction.guild.members
+            .fetch(memberId)
+            .catch(() => null); // Adicionado .catch
           if (!targetMember) {
             await interaction.reply({
               content: "Membro não encontrado no servidor.",
@@ -1140,20 +1107,23 @@ module.exports = {
             ephemeral: true,
           });
         } catch (error) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao chamar membro via DM:`,
-            error
-          );
+          logError(`Erro ao chamar membro via DM:`, error);
           if (error.code === 50007) {
             await interaction.reply({
-              content: `Não foi possível enviar a mensagem privada para ${targetMember.user.tag}. Eles podem ter DMs desativadas.`,
+              content: `Não foi possível enviar a mensagem privada para ${
+                targetMember
+                  ? targetMember.user.tag
+                  : "o usuário com o ID fornecido"
+              }. Eles podem ter DMs desativadas.`,
               ephemeral: true,
             });
           } else {
             await interaction.reply({
-              content: `⚠️ Erro ao enviar a DM de notificação para ${targetMember.user.tag}.`,
+              content: `⚠️ Erro ao enviar a DM de notificação para ${
+                targetMember
+                  ? targetMember.user.tag
+                  : "o usuário com o ID fornecido"
+              }.`,
               ephemeral: true,
             });
           }
@@ -1163,7 +1133,9 @@ module.exports = {
         const currentChannel = interaction.channel;
 
         try {
-          const targetMember = await interaction.guild.members.fetch(memberId);
+          const targetMember = await interaction.guild.members
+            .fetch(memberId)
+            .catch(() => null);
           if (!targetMember) {
             return interaction.reply({
               content: "Membro não encontrado no servidor.",
@@ -1184,12 +1156,7 @@ module.exports = {
             ephemeral: true,
           });
         } catch (error) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao adicionar membro:`,
-            error
-          );
+          logError(`Erro ao adicionar membro:`, error);
           await interaction.reply({
             content:
               "Não foi possível adicionar o membro. Verifique o ID ou permissões do bot.",
@@ -1204,10 +1171,16 @@ module.exports = {
         try {
           const topicData = JSON.parse(currentChannel.topic || "{}");
           ticketOpenerId = topicData.userId;
-        } catch (e) {}
+        } catch (e) {
+          logWarn(
+            `Erro ao parsear tópico do canal ao remover membro: ${e.message}`
+          );
+        }
 
         try {
-          const targetMember = await interaction.guild.members.fetch(memberId);
+          const targetMember = await interaction.guild.members
+            .fetch(memberId)
+            .catch(() => null);
           if (!targetMember) {
             return interaction.reply({
               content: "Membro não encontrado no servidor.",
@@ -1232,12 +1205,7 @@ module.exports = {
             ephemeral: true,
           });
         } catch (error) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao remover membro:`,
-            error
-          );
+          logError(`Erro ao remover membro:`, error);
           await interaction.reply({
             content:
               "Não foi possível remover o membro. Verifique o ID ou permissões do bot.",
@@ -1250,9 +1218,9 @@ module.exports = {
         const currentChannel = interaction.channel;
 
         try {
-          const targetCategory = await interaction.guild.channels.fetch(
-            newCategoryId
-          );
+          const targetCategory = await interaction.guild.channels
+            .fetch(newCategoryId)
+            .catch(() => null);
 
           if (
             !targetCategory ||
@@ -1275,12 +1243,7 @@ module.exports = {
             ephemeral: true,
           });
         } catch (error) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro ao mover ticket:`,
-            error
-          );
+          logError(`Erro ao mover ticket:`, error);
           await interaction.reply({
             content:
               "Não foi possível mover o ticket. Verifique o ID da categoria ou permissões do bot.",
@@ -1310,12 +1273,7 @@ module.exports = {
             );
             ticketType = topicData.ticketType || "N/A";
           } catch (e) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Erro ao parsear tópico do canal ao finalizar ticket:`,
-              e
-            );
+            logError(`Erro ao parsear tópico do canal ao finalizar ticket:`, e);
             await interaction.reply({
               content:
                 "Erro interno: Não foi possível ler os dados do ticket. O ticket pode ter sido criado antes das atualizações.",
@@ -1327,17 +1285,13 @@ module.exports = {
           await interaction.deferReply({ ephemeral: true });
 
           const TICKET_LOGS_CHANNEL_ID = process.env.TICKET_LOGS_CHANNEL_ID;
-          console.log(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Verificando TICKET_LOGS_CHANNEL_ID: ${TICKET_LOGS_CHANNEL_ID}`
+          logInfo(
+            `Verificando TICKET_LOGS_CHANNEL_ID: ${TICKET_LOGS_CHANNEL_ID}`
           );
 
           if (!TICKET_LOGS_CHANNEL_ID) {
-            console.error(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] ERRO CRÍTICO: TICKET_LOGS_CHANNEL_ID não configurado no .env! Não é possível gerar logs.`
+            logError(
+              `ERRO CRÍTICO: TICKET_LOGS_CHANNEL_ID não configurado no .env! Não é possível gerar logs.`
             );
             await interaction.followUp({
               content:
@@ -1346,10 +1300,8 @@ module.exports = {
             });
           } else {
             try {
-              console.log(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Tentando buscar mensagens do canal ${currentChannel.id}...`
+              logInfo(
+                `Tentando buscar mensagens do canal ${currentChannel.id}...`
               );
               const messages = await currentChannel.messages.fetch({
                 limit: 100,
@@ -1357,11 +1309,7 @@ module.exports = {
               const sortedMessages = messages.sort(
                 (a, b) => a.createdTimestamp - b.createdTimestamp
               );
-              console.log(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] ${sortedMessages.size} mensagens encontradas.`
-              );
+              logInfo(`${sortedMessages.size} mensagens encontradas.`);
 
               let transcriptContent = `--- Transcrição do Ticket #${ticketNumber} (${ticketType}) ---\n`;
               transcriptContent += `Canal: #${currentChannel.name}\n`;
@@ -1404,34 +1352,22 @@ module.exports = {
                 }
                 transcriptContent += `\n`;
               }
-              console.log(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Conteúdo da transcrição formatado.`
-              );
+              logInfo(`Conteúdo da transcrição formatado.`);
 
               const fileName = `ticket-${ticketNumber}-${currentChannel.name}.txt`;
               const transcriptsDir = path.join(__dirname, "..", "transcripts");
               const filePath = path.join(transcriptsDir, fileName);
 
               if (!fs.existsSync(transcriptsDir)) {
-                console.log(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Pasta 'transcripts' não existe. Tentando criar: ${transcriptsDir}`
+                logInfo(
+                  `Pasta 'transcripts' não existe. Tentando criar: ${transcriptsDir}`
                 );
                 try {
                   fs.mkdirSync(transcriptsDir, { recursive: true });
-                  console.log(
-                    `[${new Date().toLocaleString("pt-BR", {
-                      timeZone: "America/Sao_Paulo",
-                    })}] Pasta 'transcripts' criada com sucesso.`
-                  );
+                  logInfo(`Pasta 'transcripts' criada com sucesso.`);
                 } catch (dirError) {
-                  console.error(
-                    `[${new Date().toLocaleString("pt-BR", {
-                      timeZone: "America/Sao_Paulo",
-                    })}] ERRO: Não foi possível criar o diretório de transcrições ${transcriptsDir}:`,
+                  logError(
+                    `ERRO: Não foi possível criar o diretório de transcrições ${transcriptsDir}:`,
                     dirError
                   );
                   await interaction.followUp({
@@ -1441,34 +1377,18 @@ module.exports = {
                   });
                 }
               } else {
-                console.log(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Pasta 'transcripts' já existe: ${transcriptsDir}`
-                );
+                logInfo(`Pasta 'transcripts' já existe: ${transcriptsDir}`);
               }
 
-              console.log(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Tentando escrever arquivo de transcrição: ${filePath}`
-              );
+              logInfo(`Tentando escrever arquivo de transcrição: ${filePath}`);
               await fs.promises.writeFile(filePath, transcriptContent, "utf8");
-              console.log(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Arquivo de transcrição escrito com sucesso.`
-              );
+              logInfo(`Arquivo de transcrição escrito com sucesso.`);
 
-              const logsChannel = await interaction.guild.channels.fetch(
-                TICKET_LOGS_CHANNEL_ID
-              );
+              const logsChannel = await interaction.guild.channels
+                .fetch(TICKET_LOGS_CHANNEL_ID)
+                .catch(() => null); // Adicionado .catch
               if (logsChannel && logsChannel.type === ChannelType.GuildText) {
-                console.log(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Tentando enviar transcrição para o Discord.`
-                );
+                logInfo(`Tentando enviar transcrição para o Discord.`);
                 const logEmbed = new EmbedBuilder()
                   .setColor(0x008080)
                   .setTitle(`📝 Transcrição do Ticket #${ticketNumber}`)
@@ -1496,16 +1416,12 @@ module.exports = {
                   embeds: [logEmbed],
                   files: [{ attachment: filePath, name: fileName }],
                 });
-                console.log(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Transcrição do ticket #${ticketNumber} enviada para o canal de logs.`
+                logInfo(
+                  `Transcrição do ticket #${ticketNumber} enviada para o canal de logs.`
                 );
               } else {
-                console.error(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] ERRO: Canal de logs de tickets (${TICKET_LOGS_CHANNEL_ID}) não encontrado ou não é um canal de texto válido. Não foi possível enviar a transcrição para o Discord.`
+                logError(
+                  `ERRO: Canal de logs de tickets (${TICKET_LOGS_CHANNEL_ID}) não encontrado ou não é um canal de texto válido. Não foi possível enviar a transcrição para o Discord.`
                 );
                 await interaction.followUp({
                   content:
@@ -1516,24 +1432,15 @@ module.exports = {
 
               fs.unlink(filePath, (err) => {
                 if (err)
-                  console.error(
-                    `[${new Date().toLocaleString("pt-BR", {
-                      timeZone: "America/Sao_Paulo",
-                    })}] Erro ao deletar ficheiro de transcrição local:`,
+                  logError(
+                    `Erro ao deletar ficheiro de transcrição local:`,
                     err
                   );
-                else
-                  console.log(
-                    `[${new Date().toLocaleString("pt-BR", {
-                      timeZone: "America/Sao_Paulo",
-                    })}] Ficheiro de transcrição local deletado.`
-                  );
+                else logInfo(`Ficheiro de transcrição local deletado.`);
               });
             } catch (transcriptError) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] ERRO GERAL no processo de transcrição do ticket:`,
+              logError(
+                `ERRO GERAL no processo de transcrição do ticket:`,
                 transcriptError
               );
               await interaction.followUp({
@@ -1546,9 +1453,9 @@ module.exports = {
 
           if (ticketOpenerId) {
             try {
-              const ticketOpener = await interaction.client.users.fetch(
-                ticketOpenerId
-              );
+              const ticketOpener = await interaction.client.users
+                .fetch(ticketOpenerId)
+                .catch(() => null); // Adicionado .catch
               if (ticketOpener) {
                 const dmFinalizeEmbed = new EmbedBuilder()
                   .setColor(0xffa500)
@@ -1585,17 +1492,11 @@ module.exports = {
                 await currentChannel.send(
                   `✅ Ticket finalizado por ${staffMember}. Uma DM de notificação foi enviada para o criador do ticket.`
                 );
-                console.log(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] DM de finalização enviada para ${ticketOpener.tag}.`
-                );
+                logInfo(`DM de finalização enviada para ${ticketOpener.tag}.`);
               }
             } catch (error) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Erro ao enviar DM de finalização para o usuário (${ticketOpenerId}):`,
+              logError(
+                `Erro ao enviar DM de finalização para o usuário (${ticketOpenerId}):`,
                 error
               );
               if (error.code === 50007) {
@@ -1624,10 +1525,8 @@ module.exports = {
               currentChannel.id
             );
           } else {
-            console.warn(
-              `[${new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })}] Não foi possível enviar solicitação de avaliação: Criador do ticket não identificado.`
+            logWarn(
+              `Não foi possível enviar solicitação de avaliação: Criador do ticket não identificado.`
             );
           }
 
@@ -1641,12 +1540,7 @@ module.exports = {
             await currentChannel.delete();
           }, 5000);
         } catch (generalError) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro inesperado ao finalizar ticket:`,
-            generalError
-          );
+          logError(`Erro inesperado ao finalizar ticket:`, generalError);
           if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({
               content:
@@ -1663,17 +1557,9 @@ module.exports = {
         }
       } else if (interaction.customId === "ban_notification_modal") {
         try {
-          console.log(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Tentando deferir a resposta do modal de banimento...`
-          );
+          logInfo(`Tentando deferir a resposta do modal de banimento...`);
           await interaction.deferReply({ ephemeral: true });
-          console.log(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Resposta do modal de banimento deferida.`
-          );
+          logInfo(`Resposta do modal de banimento deferida.`);
 
           const nameInGame =
             interaction.fields.getTextInputValue("name_ingame_modal");
@@ -1697,9 +1583,9 @@ module.exports = {
             return;
           }
 
-          const banLogChannel = await interaction.guild.channels.fetch(
-            banLogChannelId
-          );
+          const banLogChannel = await interaction.guild.channels
+            .fetch(banLogChannelId)
+            .catch(() => null); // Adicionado .catch
           if (!banLogChannel || banLogChannel.type !== ChannelType.GuildText) {
             await interaction.editReply({
               content:
@@ -1718,17 +1604,17 @@ module.exports = {
 
             if (extractedId) {
               try {
-                targetDiscordUser = await interaction.client.users.fetch(
-                  extractedId
-                );
+                targetDiscordUser = await interaction.client.users
+                  .fetch(extractedId)
+                  .catch(() => null); // Adicionado .catch
                 discordMentionValue = `<@${extractedId}> (${
-                  targetDiscordUser.tag || "Usuário desconhecido"
+                  targetDiscordUser
+                    ? targetDiscordUser.tag
+                    : "Usuário desconhecido"
                 })`;
               } catch (fetchError) {
-                console.error(
-                  `[${new Date().toLocaleString("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                  })}] Erro ao buscar usuário pelo ID/menção manual (${extractedId}):`,
+                logError(
+                  `Erro ao buscar usuário pelo ID/menção manual (${extractedId}):`,
                   fetchError
                 );
                 discordMentionValue = `ID: ${extractedId} (Usuário não encontrado)`;
@@ -1782,12 +1668,8 @@ module.exports = {
                 ephemeral: true,
               });
             } catch (dmError) {
-              console.error(
-                `[${new Date().toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}] Erro ao enviar DM de banimento para ${
-                  targetDiscordUser.tag
-                }:`,
+              logError(
+                `Erro ao enviar DM de banimento para ${targetDiscordUser.tag}:`,
                 dmError
               );
               if (dmError.code === 50007) {
@@ -1804,10 +1686,8 @@ module.exports = {
             }
           }
         } catch (generalError) {
-          console.error(
-            `[${new Date().toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}] Erro inesperado ao processar modal de banimento:`,
+          logError(
+            `Erro inesperado ao processar modal de banimento:`,
             generalError
           );
           if (!interaction.replied && !interaction.deferred) {

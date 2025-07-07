@@ -12,6 +12,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 require("dotenv").config();
 
+const { logInfo, logWarn, logError } = require("./utils/logger");
 const {
   checkInactiveTickets,
   updateTicketActivity,
@@ -40,14 +41,14 @@ try {
     if ("data" in command && "execute" in command) {
       client.commands.set(command.data.name, command);
     } else {
-      console.log(
-        `[AVISO] O comando em ${filePath} não possui as propriedades "data" ou "execute".`
+      logWarn(
+        `O comando em ${filePath} não possui as propriedades "data" ou "execute".`
       );
     }
   }
 } catch (error) {
-  console.warn(
-    `[AVISO] Não foi possível carregar comandos da pasta 'commands'. Ela pode estar vazia ou não existir. Erro: ${error.message}`
+  logWarn(
+    `Não foi possível carregar comandos da pasta 'commands'. Ela pode estar vazia ou não existir. Erro: ${error.message}`
   );
 }
 
@@ -75,6 +76,10 @@ async function getPanelMessageId() {
     const data = await fs.promises.readFile(PANEL_MESSAGE_ID_FILE, "utf8");
     return JSON.parse(data).messageId;
   } catch (error) {
+    logWarn(
+      `Não foi possível ler panel_message_id.json, iniciando sem ID de mensagem existente.`,
+      error.message
+    );
     return null;
   }
 }
@@ -88,18 +93,13 @@ async function savePanelMessageId(messageId) {
       "utf8"
     );
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao salvar ID da mensagem do painel:`,
-      error
-    );
+    logError(`Erro ao salvar ID da mensagem do painel:`, error);
   }
 }
 
 // Evento quando o bot está pronto
 client.once(Events.ClientReady, async (c) => {
-  console.log(`Pronto! Logado como ${c.user.tag}`);
+  logInfo(`Pronto! Logado como ${c.user.tag}`);
 
   // Agendar verificação de tickets inativos
   const checkIntervalMinutes = parseInt(
@@ -107,53 +107,38 @@ client.once(Events.ClientReady, async (c) => {
     10
   );
   if (checkIntervalMinutes > 0) {
-    // Chamar imediatamente na inicialização para pegar tickets antigos ou perdidos
-    console.log(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Iniciando verificação inicial de tickets inativos.`
-    );
+    logInfo(`Iniciando verificação inicial de tickets inativos.`);
     await checkInactiveTickets(client);
     setInterval(() => {
-      console.log(
-        `[${new Date().toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
-        })}] Executando verificação agendada de tickets inativos.`
-      );
+      logInfo(`Executando verificação agendada de tickets inativos.`);
       checkInactiveTickets(client);
     }, checkIntervalMinutes * 60 * 1000);
-    console.log(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Verificação de tickets inativos agendada para cada ${checkIntervalMinutes} minutos.`
+    logInfo(
+      `Verificação de tickets inativos agendada para cada ${checkIntervalMinutes} minutos.`
     );
   } else {
-    console.warn(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] TICKET_INACTIVITY_CHECK_INTERVAL_MINUTES está desativado (<= 0). Auto-fechamento de tickets inativos não será executado.`
+    logWarn(
+      `TICKET_INACTIVITY_CHECK_INTERVAL_MINUTES está desativado (<= 0). Auto-fechamento de tickets inativos não será executado.`
     );
   }
 
   // Gerenciar o painel de tickets automático
   const panelChannelId = process.env.TICKET_PANEL_CHANNEL_ID;
   if (!panelChannelId) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] TICKET_PANEL_CHANNEL_ID não configurado no .env! O painel de tickets automático não será enviado.`
+    logError(
+      `TICKET_PANEL_CHANNEL_ID não configurado no .env! O painel de tickets automático não será enviado.`
     );
     return;
   }
 
   try {
-    const panelChannel = await client.channels.fetch(panelChannelId);
+    const panelChannel = await client.channels
+      .fetch(panelChannelId)
+      .catch(() => null);
 
     if (!panelChannel || panelChannel.type !== ChannelType.GuildText) {
-      console.error(
-        `[${new Date().toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
-        })}] Canal do painel de tickets (${panelChannelId}) inválido ou não é um canal de texto.`
+      logError(
+        `Canal do painel de tickets (${panelChannelId}) inválido ou não é um canal de texto.`
       );
       return;
     }
@@ -224,27 +209,19 @@ client.once(Events.ClientReady, async (c) => {
       try {
         panelMessage = await panelChannel.messages.fetch(existingMessageId);
         await panelMessage.edit({ embeds: [panelEmbed], components: [row] });
-        console.log(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Painel de tickets atualizado no canal: ${panelChannel.name}`
-        );
+        logInfo(`Painel de tickets atualizado no canal: ${panelChannel.name}`);
       } catch (error) {
-        console.error(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Mensagem do painel não encontrada ou erro ao editar. Enviando nova mensagem...`,
-          error.message
+        logError(
+          `Mensagem do painel não encontrada ou erro ao editar. Enviando nova mensagem...`,
+          error
         );
         panelMessage = await panelChannel.send({
           embeds: [panelEmbed],
           components: [row],
         });
         await savePanelMessageId(panelMessage.id);
-        console.log(
-          `[${new Date().toLocaleString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          })}] Novo painel de tickets enviado no canal: ${panelChannel.name}`
+        logInfo(
+          `Novo painel de tickets enviado no canal: ${panelChannel.name}`
         );
       }
     } else {
@@ -253,21 +230,12 @@ client.once(Events.ClientReady, async (c) => {
         components: [row],
       });
       await savePanelMessageId(panelMessage.id);
-      console.log(
-        `[${new Date().toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
-        })}] Painel de tickets enviado pela primeira vez no canal: ${
-          panelChannel.name
-        }`
+      logInfo(
+        `Painel de tickets enviado pela primeira vez no canal: ${panelChannel.name}`
       );
     }
   } catch (error) {
-    console.error(
-      `[${new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      })}] Erro ao gerenciar o painel de tickets automático:`,
-      error
-    );
+    logError(`Erro ao gerenciar o painel de tickets automático:`, error);
   }
 });
 

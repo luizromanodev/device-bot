@@ -2,6 +2,7 @@ const { REST, Routes } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
 require("dotenv").config();
+const { logInfo, logWarn, logError } = require("./utils/logger");
 
 const commands = [];
 
@@ -18,14 +19,14 @@ try {
     if ("data" in command && "execute" in command) {
       commands.push(command.data.toJSON());
     } else {
-      console.log(
-        `[AVISO] O comando em ${filePath} não possui as propriedades "data" ou "execute".`
+      logWarn(
+        `O comando em ${filePath} não possui as propriedades "data" ou "execute".`
       );
     }
   }
 } catch (error) {
-  console.warn(
-    `[AVISO] Não foi possível ler comandos da pasta 'commands' para registro. Ela pode estar vazia ou não existir. Erro: ${error.message}`
+  logWarn(
+    `Não foi possível ler comandos da pasta 'commands' para registro. Ela pode estar vazia ou não existir. Erro: ${error.message}`
   );
 }
 
@@ -33,7 +34,7 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    console.log(
+    logInfo(
       `Começando a atualizar ${commands.length} comandos de aplicação (/).`
     );
 
@@ -45,16 +46,15 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
       { body: commands }
     );
 
-    console.log(
+    logInfo(
       `Comandos de aplicação (/) recarregados com sucesso: ${data.length}.`
     );
-    console.log(
-      "Se o número de comandos for 0, isso é esperado, pois não há comandos de barra definidos no projeto."
-    );
+    if (data.length === 0) {
+      logInfo(
+        "Se o número de comandos for 0, isso é esperado, pois não há comandos de barra definidos no projeto ou a pasta 'commands' está vazia."
+      );
+    }
   } catch (error) {
-    console.error(
-      "Erro ao recarregar comandos de aplicação (/) no Discord:",
-      error
-    );
+    logError("Erro ao recarregar comandos de aplicação (/) no Discord:", error);
   }
 })();
