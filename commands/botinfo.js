@@ -1,4 +1,3 @@
-// commands/botinfo.js
 const { SlashCommandBuilder, EmbedBuilder, version } = require("discord.js");
 const { logInfo } = require("../utils/logger");
 
@@ -9,7 +8,6 @@ module.exports = {
   async execute(interaction) {
     const client = interaction.client;
 
-    // Calcular Uptime
     let totalSeconds = client.uptime / 1000;
     let days = Math.floor(totalSeconds / 86400);
     totalSeconds %= 86400;
@@ -20,7 +18,7 @@ module.exports = {
     let uptimeString = `${days}d ${hours}h ${minutes}m ${seconds}s`;
 
     const botInfoEmbed = new EmbedBuilder()
-      .setColor(0x7289da) // Cor padrão do Discord para bots
+      .setColor(0x7289da)
       .setTitle(`🤖 Informações sobre ${client.user.username}`)
       .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
       .addFields(
@@ -28,7 +26,7 @@ module.exports = {
           name: "👑 Desenvolvedor",
           value: "Seu Nome/Tag aqui (ou ID)",
           inline: true,
-        }, // Altere para seu nome/tag ou ID
+        },
         { name: "🆔 ID do Bot", value: `\`${client.user.id}\``, inline: true },
         {
           name: "📊 Servidores",

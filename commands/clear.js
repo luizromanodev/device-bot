@@ -1,4 +1,3 @@
-// commands/clear.js
 const { SlashCommandBuilder, PermissionsBitField } = require("discord.js");
 
 module.exports = {

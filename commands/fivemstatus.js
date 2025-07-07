@@ -1,14 +1,13 @@
-// commands/fivemstatus.js
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { logInfo, logWarn, logError } = require("../utils/logger");
-require("dotenv").config(); // Para usar variáveis de ambiente
+require("dotenv").config();
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("fivemstatus")
     .setDescription("Mostra o status e informações do servidor FiveM."),
   async execute(interaction) {
-    await interaction.deferReply(); // Deferir a resposta para evitar timeout
+    await interaction.deferReply();
 
     const serverName = process.env.FIVEM_SERVER_NAME || "Sua Cidade RP"; // Nome da sua cidade/servidor
     const serverIP = process.env.FIVEM_SERVER_IP || "play.suacidade.com:30120"; // IP ou Domínio do seu servidor FiveM
@@ -46,7 +45,7 @@ module.exports = {
     // -----------------------------------------------------------
 
     const statusEmbed = new EmbedBuilder()
-      .setColor(serverStatus.includes("Online") ? 0x00ff00 : 0xff0000) // Verde se online, vermelho se offline
+      .setColor(serverStatus.includes("Online") ? 0x00ff00 : 0xff0000)
       .setTitle(`🚨 Status do Servidor ${serverName} 🚨`)
       .setDescription(`Informações atualizadas sobre a sua cidade no FiveM.`)
       .addFields(

@@ -1,4 +1,3 @@
-// commands/infos.js
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { logInfo } = require("../utils/logger");
 require("dotenv").config();
@@ -11,7 +10,7 @@ module.exports = {
     const serverName = process.env.FIVEM_SERVER_NAME || "Sua Cidade RP";
 
     const infosEmbed = new EmbedBuilder()
-      .setColor(0x8a2be2) // Roxo
+      .setColor(0x8a2be2)
       .setTitle(`ℹ️ Informações Essenciais de ${serverName} ℹ️`)
       .setDescription(
         `Bem-vindo(a) à ${serverName}! Aqui estão alguns pontos importantes para você começar e entender o funcionamento da nossa cidade.`

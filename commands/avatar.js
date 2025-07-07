@@ -1,4 +1,3 @@
-// commands/avatar.js
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { logInfo } = require("../utils/logger");
 
@@ -14,12 +13,12 @@ module.exports = {
     ),
   async execute(interaction) {
     const targetUser =
-      interaction.options.getUser("usuario") || interaction.user; // Pega o usuário mencionado ou o próprio executor
+      interaction.options.getUser("usuario") || interaction.user;
 
     const avatarEmbed = new EmbedBuilder()
       .setColor(0x0099ff)
       .setTitle(`Avatar de ${targetUser.tag}`)
-      .setImage(targetUser.displayAvatarURL({ dynamic: true, size: 4096 })) // dynamic para GIFs, size para qualidade
+      .setImage(targetUser.displayAvatarURL({ dynamic: true, size: 4096 }))
       .setFooter({ text: `Solicitado por ${interaction.user.tag}` })
       .setTimestamp();
 

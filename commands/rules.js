@@ -1,4 +1,3 @@
-// commands/rules.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -28,12 +27,12 @@ module.exports = {
       return await interaction.reply({
         content:
           "O link das regras não foi configurado no bot. Por favor, contate a administração do bot.",
-        flags: [MessageFlags.Ephemeral], // Mensagem visível apenas para quem usou o comando
+        flags: [MessageFlags.Ephemeral],
       });
     }
 
     const rulesEmbed = new EmbedBuilder()
-      .setColor(0x00bfff) // Azul claro
+      .setColor(0x00bfff)
       .setTitle(`📜 Regras Oficiais de ${serverName} 📜`)
       .setDescription(
         `Para uma experiência de Roleplay saudável e divertida em **${serverName}**, é fundamental que todos os jogadores conheçam e sigam as regras da nossa comunidade.\n\n` +

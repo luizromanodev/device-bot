@@ -1,10 +1,9 @@
-// commands/serverinfo.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
   ChannelType,
 } = require("discord.js");
-const { logInfo, logError } = require("../utils/logger"); // Importa o logger
+const { logInfo, logError } = require("../utils/logger");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,10 +17,10 @@ module.exports = {
       });
     }
 
-    await interaction.deferReply(); // Deferir a resposta para evitar timeout
+    await interaction.deferReply();
 
     const guild = interaction.guild;
-    const owner = await guild.fetchOwner().catch(() => null); // Busca o owner de forma segura
+    const owner = await guild.fetchOwner().catch(() => null);
 
     // Contagem de membros por status
     const members = await guild.members.fetch();

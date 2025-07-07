@@ -1,4 +1,3 @@
-// commands/links.js
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { logInfo } = require("../utils/logger");
 require("dotenv").config();
@@ -25,7 +24,7 @@ module.exports = {
       process.env.FIVEM_YOUTUBE_LINK || "https://youtube.com/suacidade"; // NOVO: Link do YouTube
 
     const linksEmbed = new EmbedBuilder()
-      .setColor(0xffa500) // Laranja
+      .setColor(0xffa500)
       .setTitle(`🔗 Links Úteis de ${serverName} 🔗`)
       .setDescription(
         "Acesse rapidamente os recursos mais importantes da nossa comunidade!"

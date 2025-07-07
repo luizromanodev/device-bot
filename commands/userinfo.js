@@ -1,6 +1,5 @@
-// commands/userinfo.js
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { logInfo, logError } = require("../utils/logger"); // Importa o logger
+const { logInfo, logError } = require("../utils/logger");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,16 +12,16 @@ module.exports = {
         .setRequired(false)
     ),
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true }); // Resposta efêmera, só o usuário vê
+    await interaction.deferReply({ ephemeral: true });
 
     const targetUser =
-      interaction.options.getUser("usuario") || interaction.user; // Pega o usuário mencionado ou o próprio usuário que usou o comando
+      interaction.options.getUser("usuario") || interaction.user;
     const member = interaction.guild
       ? await interaction.guild.members.fetch(targetUser.id).catch(() => null)
-      : null; // Tenta buscar o membro se o comando for em guild
+      : null;
 
     const userInfoEmbed = new EmbedBuilder()
-      .setColor(member ? member.displayHexColor : 0x0099ff) // Cor do cargo mais alto do membro, se houver
+      .setColor(member ? member.displayHexColor : 0x0099ff)
       .setTitle(`Informações do Usuário: ${targetUser.tag}`)
       .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
       .addFields(
@@ -51,7 +50,6 @@ module.exports = {
       .setFooter({ text: `Solicitado por ${interaction.user.tag}` });
 
     if (member) {
-      // Informações específicas de membro do servidor
       userInfoEmbed.addFields(
         {
           name: "🚀 Entrou no servidor em",
@@ -72,7 +70,6 @@ module.exports = {
       );
     }
 
-    // Adiciona status customizado se houver
     const presence = member?.presence;
     if (presence && presence.activities.length > 0) {
       const customStatus = presence.activities.find(

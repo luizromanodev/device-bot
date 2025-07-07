@@ -6,7 +6,6 @@ module.exports = {
     .setName("ping")
     .setDescription("Verifica a latência do bot."),
   async execute(interaction) {
-    // Responde com uma mensagem temporária enquanto calcula o ping
     await interaction.deferReply({ ephemeral: true });
 
     // Calcula a latência da API do Discord
