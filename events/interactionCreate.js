@@ -52,6 +52,168 @@ module.exports = {
 
     // comandos de barra (/)
     if (interaction.isChatInputCommand()) {
+      // --- comando /clear ---
+      if (interaction.commandName === "clear") {
+        if (!interaction.inGuild()) {
+          return await interaction.reply({
+            content: "Este comando só pode ser usado em um servidor.",
+            ephemeral: true,
+          });
+        }
+
+        if (
+          !interaction.member.permissions.has(
+            PermissionsBitField.Flags.ManageMessages
+          )
+        ) {
+          return await interaction.reply({
+            content: "Você não tem permissão para usar este comando.",
+            ephemeral: true,
+          });
+        }
+
+        const amount = interaction.options.getInteger("quantidade");
+        const targetUser = interaction.options.getUser("usuario");
+        const channel = interaction.channel;
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+          let messages;
+          const fetchLimit = targetUser ? Math.min(amount * 2, 100) : amount;
+          messages = await channel.messages.fetch({ limit: fetchLimit });
+
+          if (targetUser) {
+            messages = messages
+              .filter((msg) => msg.author.id === targetUser.id)
+              .first(amount);
+          } else {
+            messages = messages.first(amount);
+          }
+
+          if (messages.size === 0) {
+            return await interaction.editReply({
+              content:
+                "Nenhuma mensagem encontrada para apagar com os critérios fornecidos.",
+              ephemeral: true,
+            });
+          }
+
+          const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+          const deletableMessages = messages.filter(
+            (msg) => msg.createdTimestamp > twoWeeksAgo
+          );
+
+          if (deletableMessages.size === 0) {
+            return await interaction.editReply({
+              content:
+                "Não foi possível apagar nenhuma mensagem, pois todas as mensagens encontradas têm mais de 14 dias.",
+              ephemeral: true,
+            });
+          }
+
+          let deletedCount = 0;
+          try {
+            const bulkDeleted = await channel.bulkDelete(
+              deletableMessages,
+              true
+            );
+            deletedCount = bulkDeleted.size;
+            logInfo(
+              `Comando /clear: BulkDelete apagou ${deletedCount} mensagens no canal ${
+                channel.name
+              }${targetUser ? ` de ${targetUser.tag}` : ""} por ${
+                interaction.user.tag
+              }.`
+            );
+          } catch (bulkDeleteError) {
+            logError(
+              `Erro ao usar bulkDelete no comando /clear, tentando individualmente:`,
+              bulkDeleteError
+            );
+            for (const msg of deletableMessages.values()) {
+              if (msg.deletable) {
+                try {
+                  await msg.delete();
+                  deletedCount++;
+                } catch (individualDeleteError) {
+                  logError(
+                    `Erro ao deletar mensagem individualmente no comando /clear (${msg.id}):`,
+                    individualDeleteError
+                  );
+                }
+              }
+            }
+            logWarn(
+              `Comando /clear: BulkDelete falhou, ${deletedCount} mensagens deletadas individualmente no canal ${channel.name} por ${interaction.user.tag}.`
+            );
+          }
+
+          const replyContent = targetUser
+            ? `Apagadas **${deletedCount}** mensagens de **${targetUser.tag}**.`
+            : `Apagadas **${deletedCount}** mensagens neste canal.`;
+          await interaction.editReply({
+            content: replyContent,
+            ephemeral: false,
+          });
+
+          // Log para o canal de automod
+          const AUTOMOD_LOG_CHANNEL_ID = process.env.AUTOMOD_LOG_CHANNEL_ID;
+          if (AUTOMOD_LOG_CHANNEL_ID) {
+            const logChannel = await interaction.guild.channels
+              .fetch(AUTOMOD_LOG_CHANNEL_ID)
+              .catch(() => null);
+            if (logChannel && logChannel.type === ChannelType.GuildText) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0x00bfff)
+                .setTitle("🧹 Comando Clear Executado")
+                .setDescription(
+                  `O comando \`/clear\` foi usado por ${interaction.user.tag}.`
+                )
+                .addFields(
+                  { name: "Canal", value: `<#${channel.id}>`, inline: true },
+                  {
+                    name: "Quantidade Solicitada",
+                    value: `${amount}`,
+                    inline: true,
+                  },
+                  {
+                    name: "Usuário Alvo",
+                    value: targetUser
+                      ? `${targetUser.tag} (${targetUser.id})`
+                      : "Todos",
+                    inline: true,
+                  },
+                  {
+                    name: "Mensagens Apagadas (Efetivo)",
+                    value: `${deletedCount}`,
+                    inline: true,
+                  },
+                  {
+                    name: "Executor",
+                    value: `${interaction.user.tag} (${interaction.user.id})`,
+                    inline: true,
+                  }
+                )
+                .setTimestamp();
+              await logChannel.send({ embeds: [logEmbed] });
+            } else {
+              logWarn(
+                `Canal de logs de automoderação (${AUTOMOD_LOG_CHANNEL_ID}) inválido ou não é um canal de texto para log do /clear.`
+              );
+            }
+          }
+        } catch (error) {
+          logError(`Erro ao executar o comando /clear:`, error);
+          await interaction.editReply({
+            content:
+              "Ocorreu um erro ao tentar apagar as mensagens. Verifique as permissões do bot.",
+            ephemeral: true,
+          });
+        }
+        return;
+      }
+
       // comando /ban
       if (interaction.commandName === "ban") {
         if (!interaction.inGuild()) {
@@ -60,7 +222,6 @@ module.exports = {
             ephemeral: true,
           });
         }
-
         const modal = new ModalBuilder()
           .setCustomId("ban_notification_modal")
           .setTitle("Notificar Banimento/Advertência");
@@ -111,7 +272,7 @@ module.exports = {
         await interaction.showModal(modal);
         return;
       }
-      // outros comandos de barra
+      // comandos de barra
       else {
         const command = interaction.client.commands.get(
           interaction.commandName
@@ -710,6 +871,7 @@ module.exports = {
               embeds: [callEmbed],
               components: [callButtonRow],
             });
+
             await interaction.editReply({
               content: `Call "${voiceChannel.name}" criada com sucesso em <#${voiceChannel.id}>!`,
               ephemeral: true,
@@ -826,7 +988,7 @@ module.exports = {
             try {
               const ratingLogChannel = await interaction.client.channels
                 .fetch(RATING_LOG_CHANNEL_ID)
-                .catch(() => null); // Adicionado .catch
+                .catch(() => null);
               if (
                 !ratingLogChannel ||
                 ratingLogChannel.type !== ChannelType.GuildText
@@ -1005,7 +1167,7 @@ module.exports = {
           try {
             const ticketOpener = await interaction.client.users
               .fetch(ticketOpenerId)
-              .catch(() => null); // Adicionado .catch
+              .catch(() => null);
             if (ticketOpener) {
               const dmToOpenerEmbed = new EmbedBuilder()
                 .setColor(0x00ff7f)
@@ -1068,7 +1230,7 @@ module.exports = {
         try {
           const targetMember = await interaction.guild.members
             .fetch(memberId)
-            .catch(() => null); // Adicionado .catch
+            .catch(() => null);
           if (!targetMember) {
             await interaction.reply({
               content: "Membro não encontrado no servidor.",
@@ -1386,7 +1548,7 @@ module.exports = {
 
               const logsChannel = await interaction.guild.channels
                 .fetch(TICKET_LOGS_CHANNEL_ID)
-                .catch(() => null); // Adicionado .catch
+                .catch(() => null);
               if (logsChannel && logsChannel.type === ChannelType.GuildText) {
                 logInfo(`Tentando enviar transcrição para o Discord.`);
                 const logEmbed = new EmbedBuilder()
@@ -1455,7 +1617,7 @@ module.exports = {
             try {
               const ticketOpener = await interaction.client.users
                 .fetch(ticketOpenerId)
-                .catch(() => null); // Adicionado .catch
+                .catch(() => null);
               if (ticketOpener) {
                 const dmFinalizeEmbed = new EmbedBuilder()
                   .setColor(0xffa500)
@@ -1585,7 +1747,7 @@ module.exports = {
 
           const banLogChannel = await interaction.guild.channels
             .fetch(banLogChannelId)
-            .catch(() => null); // Adicionado .catch
+            .catch(() => null);
           if (!banLogChannel || banLogChannel.type !== ChannelType.GuildText) {
             await interaction.editReply({
               content:
@@ -1606,7 +1768,7 @@ module.exports = {
               try {
                 targetDiscordUser = await interaction.client.users
                   .fetch(extractedId)
-                  .catch(() => null); // Adicionado .catch
+                  .catch(() => null);
                 discordMentionValue = `<@${extractedId}> (${
                   targetDiscordUser
                     ? targetDiscordUser.tag
