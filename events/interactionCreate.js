@@ -62,7 +62,6 @@ module.exports = {
           });
         }
 
-        // Verifica a permissão do usuário que executou o comando
         if (
           !interaction.member.permissions.has(
             PermissionsBitField.Flags.ManageMessages
