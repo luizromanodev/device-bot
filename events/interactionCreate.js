@@ -11,6 +11,7 @@ const {
   TextInputStyle,
   ChannelSelectMenuBuilder,
   StringSelectMenuBuilder,
+  MessageFlags,
 } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -57,10 +58,11 @@ module.exports = {
         if (!interaction.inGuild()) {
           return await interaction.reply({
             content: "Este comando só pode ser usado em um servidor.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
 
+        // Verifica a permissão do usuário que executou o comando
         if (
           !interaction.member.permissions.has(
             PermissionsBitField.Flags.ManageMessages
@@ -68,7 +70,7 @@ module.exports = {
         ) {
           return await interaction.reply({
             content: "Você não tem permissão para usar este comando.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
 
@@ -76,7 +78,7 @@ module.exports = {
         const targetUser = interaction.options.getUser("usuario");
         const channel = interaction.channel;
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         try {
           let messages;
@@ -95,7 +97,7 @@ module.exports = {
             return await interaction.editReply({
               content:
                 "Nenhuma mensagem encontrada para apagar com os critérios fornecidos.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
@@ -108,7 +110,7 @@ module.exports = {
             return await interaction.editReply({
               content:
                 "Não foi possível apagar nenhuma mensagem, pois todas as mensagens encontradas têm mais de 14 dias.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
@@ -157,7 +159,6 @@ module.exports = {
             ephemeral: false,
           });
 
-          // Log para o canal de automod
           const AUTOMOD_LOG_CHANNEL_ID = process.env.AUTOMOD_LOG_CHANNEL_ID;
           if (AUTOMOD_LOG_CHANNEL_ID) {
             const logChannel = await interaction.guild.channels
@@ -208,7 +209,7 @@ module.exports = {
           await interaction.editReply({
             content:
               "Ocorreu um erro ao tentar apagar as mensagens. Verifique as permissões do bot.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
         return;
@@ -219,7 +220,7 @@ module.exports = {
         if (!interaction.inGuild()) {
           return await interaction.reply({
             content: "Este comando só pode ser usado em um servidor.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
         const modal = new ModalBuilder()
@@ -272,7 +273,7 @@ module.exports = {
         await interaction.showModal(modal);
         return;
       }
-      // comandos de barra
+      // outros comandos de barra
       else {
         const command = interaction.client.commands.get(
           interaction.commandName
@@ -293,12 +294,12 @@ module.exports = {
           if (interaction.replied || interaction.deferred) {
             await interaction.followUp({
               content: "Houve um erro ao executar este comando!",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             await interaction.reply({
               content: "Houve um erro ao executar este comando!",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
         }
@@ -307,7 +308,7 @@ module.exports = {
     // dropdowns
     else if (interaction.isStringSelectMenu()) {
       if (interaction.customId === "ticket_select") {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         const ticketType = interaction.values[0];
         const guild = interaction.guild;
@@ -341,7 +342,7 @@ module.exports = {
             await interaction.editReply({
               content:
                 "Erro: Tipo de ticket inválido selecionado. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
         }
@@ -359,7 +360,7 @@ module.exports = {
           await interaction.editReply({
             content:
               "Erro: A categoria de destino para este tipo de ticket não foi configurada corretamente no bot. Por favor, contate a administração.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
           return;
         }
@@ -385,7 +386,7 @@ module.exports = {
             ticketType.slice(1).replace(/_/g, " ");
           await interaction.editReply({
             content: `Você já tem um ticket "${formattedTicketType}" aberto: ${existingTicketChannel}.`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
           return;
         }
@@ -502,14 +503,14 @@ module.exports = {
 
           await interaction.editReply({
             content: `Seu ticket #${formattedTicketNumber} foi aberto em ${ticketChannel}.`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         } catch (error) {
           logError(`Erro ao criar o canal do ticket:`, error);
           await interaction.editReply({
             content:
               "Houve um erro ao abrir seu ticket. Tente novamente mais tarde.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
       }
@@ -541,7 +542,7 @@ module.exports = {
             await interaction.reply({
               content:
                 "Você não tem permissão para fechar este ticket. Apenas o criador do ticket pode usar este botão.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -569,7 +570,7 @@ module.exports = {
           } else {
             await interaction.reply({
               content: "Você não tem permissão para assumir este ticket.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -604,7 +605,7 @@ module.exports = {
           } else {
             await interaction.reply({
               content: "Você não tem permissão para finalizar este ticket.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -652,7 +653,7 @@ module.exports = {
           } else {
             await interaction.reply({
               content: "Você não tem permissão para usar este botão.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -678,7 +679,7 @@ module.exports = {
           } else {
             await interaction.reply({
               content: "Você não tem permissão para usar este botão.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -704,7 +705,7 @@ module.exports = {
           } else {
             await interaction.reply({
               content: "Você não tem permissão para usar este botão.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -730,7 +731,7 @@ module.exports = {
           } else {
             await interaction.reply({
               content: "Você não tem permissão para usar este botão.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -740,11 +741,11 @@ module.exports = {
             return interaction.reply({
               content:
                 "Você não tem permissão para criar uma call para este ticket.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
           try {
             const currentChannel = interaction.channel;
@@ -756,7 +757,6 @@ module.exports = {
 
             let ticketOpenerId = null;
             let ticketNumber = "N/A";
-            let ticketType = "N/A";
             try {
               const topicData = JSON.parse(currentChannel.topic || "{}");
               ticketOpenerId = topicData.userId;
@@ -874,14 +874,14 @@ module.exports = {
 
             await interaction.editReply({
               content: `Call "${voiceChannel.name}" criada com sucesso em <#${voiceChannel.id}>!`,
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } catch (error) {
             logError(`Erro ao criar a call para o ticket:`, error);
             await interaction.editReply({
               content:
                 "Houve um erro ao criar a call. Verifique as permissões do bot ou tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
           break;
@@ -891,7 +891,7 @@ module.exports = {
         if (!isStaff) {
           return interaction.reply({
             content: "Você não tem permissão para deletar esta call.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
         const voiceChannelIdToDelete = interaction.customId.split("_")[2];
@@ -905,23 +905,22 @@ module.exports = {
         ) {
           try {
             await interaction.deferUpdate();
-            await voiceChannelToDelete.delete();
             await interaction.followUp({
               content: `Call <#${voiceChannelIdToDelete}> deletada com sucesso!`,
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } catch (error) {
             logError(`Erro ao deletar call:`, error);
             await interaction.followUp({
               content:
                 "Houve um erro ao deletar a call. Verifique as permissões do bot.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
         } else {
           await interaction.reply({
             content: "Não foi possível encontrar a call para deletar.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
       } else if (interaction.customId.startsWith("rate_ticket_")) {
@@ -943,7 +942,7 @@ module.exports = {
             await interaction.followUp({
               content:
                 "Erro: ID de avaliação inválido. Por favor, contate a administração.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
@@ -959,7 +958,7 @@ module.exports = {
             );
             await interaction.followUp({
               content: "Erro: Avaliação inválida. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
@@ -968,7 +967,7 @@ module.exports = {
             await interaction.followUp({
               content:
                 "Você não pode avaliar este ticket. Apenas o criador original pode.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
@@ -982,7 +981,7 @@ module.exports = {
             await interaction.followUp({
               content:
                 "Erro: Canal de logs de avaliação não está configurado. A avaliação foi registrada, mas não pode ser logada.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             try {
@@ -999,7 +998,7 @@ module.exports = {
                 await interaction.followUp({
                   content:
                     "Erro: Canal de logs de avaliação é inválido. A avaliação foi registrada, mas não pode ser logada.",
-                  ephemeral: true,
+                  flags: [MessageFlags.Ephemeral],
                 });
               } else {
                 const ratingLogEmbed = new EmbedBuilder()
@@ -1089,10 +1088,9 @@ module.exports = {
             );
           }
 
-          // Confirmação para o usuário na DM
           await interaction.followUp({
             content: `✅ Obrigado por avaliar seu ticket #${ticketNumber} com ${rating} estrelas!`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         } catch (generalError) {
           logError(`ERRO GERAL ao processar botão de avaliação:`, generalError);
@@ -1100,13 +1098,13 @@ module.exports = {
             await interaction.followUp({
               content:
                 "Ocorreu um erro ao registrar sua avaliação. Por favor, tente novamente mais tarde.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             await interaction.reply({
               content:
                 "Ocorreu um erro ao registrar sua avaliação. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
         }
@@ -1131,6 +1129,7 @@ module.exports = {
             4,
             "0"
           );
+          ticketType = topicData.ticketType || "N/A";
         } catch (e) {
           logError(`Erro ao parsear tópico do canal ao assumir ticket:`, e);
         }
@@ -1160,7 +1159,7 @@ module.exports = {
         await interaction.channel.send({ embeds: [claimedEmbed] });
         await interaction.reply({
           content: "Atendimento assumido com sucesso!",
-          ephemeral: true,
+          flags: [MessageFlags.Ephemeral],
         });
 
         if (ticketOpenerId) {
@@ -1234,7 +1233,7 @@ module.exports = {
           if (!targetMember) {
             await interaction.reply({
               content: "Membro não encontrado no servidor.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
@@ -1266,7 +1265,7 @@ module.exports = {
           );
           await interaction.reply({
             content: `Mensagem privada enviada para ${targetMember.user.tag} com sucesso!`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         } catch (error) {
           logError(`Erro ao chamar membro via DM:`, error);
@@ -1277,7 +1276,7 @@ module.exports = {
                   ? targetMember.user.tag
                   : "o usuário com o ID fornecido"
               }. Eles podem ter DMs desativadas.`,
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             await interaction.reply({
@@ -1286,7 +1285,7 @@ module.exports = {
                   ? targetMember.user.tag
                   : "o usuário com o ID fornecido"
               }.`,
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
         }
@@ -1301,7 +1300,7 @@ module.exports = {
           if (!targetMember) {
             return interaction.reply({
               content: "Membro não encontrado no servidor.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
@@ -1315,14 +1314,14 @@ module.exports = {
           );
           await interaction.reply({
             content: `Membro ${targetMember.user.tag} adicionado com sucesso!`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         } catch (error) {
           logError(`Erro ao adicionar membro:`, error);
           await interaction.reply({
             content:
               "Não foi possível adicionar o membro. Verifique o ID ou permissões do bot.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
       } else if (interaction.customId === "remove_member_modal") {
@@ -1346,14 +1345,14 @@ module.exports = {
           if (!targetMember) {
             return interaction.reply({
               content: "Membro não encontrado no servidor.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
           if (targetMember.id === ticketOpenerId && !isStaff) {
             return interaction.reply({
               content: "Você não pode remover o criador do ticket.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
@@ -1364,14 +1363,14 @@ module.exports = {
           );
           await interaction.reply({
             content: `Membro ${targetMember.user.tag} removido com sucesso!`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         } catch (error) {
           logError(`Erro ao remover membro:`, error);
           await interaction.reply({
             content:
               "Não foi possível remover o membro. Verifique o ID ou permissões do bot.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
       } else if (interaction.customId === "move_ticket_modal") {
@@ -1390,7 +1389,7 @@ module.exports = {
           ) {
             return interaction.reply({
               content: "ID da categoria inválido ou não é uma categoria.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
 
@@ -1402,14 +1401,14 @@ module.exports = {
           );
           await interaction.reply({
             content: `Ticket movido para a categoria ${targetCategory.name} com sucesso!`,
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         } catch (error) {
           logError(`Erro ao mover ticket:`, error);
           await interaction.reply({
             content:
               "Não foi possível mover o ticket. Verifique o ID da categoria ou permissões do bot.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
         }
       } else if (interaction.customId === "finalize_ticket_modal") {
@@ -1439,12 +1438,12 @@ module.exports = {
             await interaction.reply({
               content:
                 "Erro interno: Não foi possível ler os dados do ticket. O ticket pode ter sido criado antes das atualizações.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
 
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
           const TICKET_LOGS_CHANNEL_ID = process.env.TICKET_LOGS_CHANNEL_ID;
           logInfo(
@@ -1458,7 +1457,7 @@ module.exports = {
             await interaction.followUp({
               content:
                 "Erro: O canal de logs de tickets não está configurado. Por favor, avise um administrador.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             try {
@@ -1535,7 +1534,7 @@ module.exports = {
                   await interaction.followUp({
                     content:
                       "Erro: Não foi possível criar a pasta para salvar transcrições. Verifique as permissões do bot no sistema.",
-                    ephemeral: true,
+                    flags: [MessageFlags.Ephemeral],
                   });
                 }
               } else {
@@ -1588,7 +1587,7 @@ module.exports = {
                 await interaction.followUp({
                   content:
                     "A transcrição foi gerada, mas não foi possível enviá-la para o canal de logs (canal inválido).",
-                  ephemeral: true,
+                  flags: [MessageFlags.Ephemeral],
                 });
               }
 
@@ -1608,73 +1607,9 @@ module.exports = {
               await interaction.followUp({
                 content:
                   "Houve um erro ao gerar a transcrição do ticket. Por favor, verifique os logs do bot.",
-                ephemeral: true,
+                flags: [MessageFlags.Ephemeral],
               });
             }
-          }
-
-          if (ticketOpenerId) {
-            try {
-              const ticketOpener = await interaction.client.users
-                .fetch(ticketOpenerId)
-                .catch(() => null);
-              if (ticketOpener) {
-                const dmFinalizeEmbed = new EmbedBuilder()
-                  .setColor(0xffa500)
-                  .setTitle(`Seu Ticket #${ticketNumber} Foi Finalizado`)
-                  .setDescription(
-                    `Olá! Seu ticket de suporte em **${interaction.guild.name}** foi finalizado.`
-                  )
-                  .addFields(
-                    {
-                      name: "Finalizado por",
-                      value: staffMember.user.tag,
-                      inline: true,
-                    },
-                    { name: "Motivo", value: finalizationReason, inline: true },
-                    {
-                      name: "Horário",
-                      value: new Date().toLocaleString("pt-BR", {
-                        timeZone: "America/Sao_Paulo",
-                      }),
-                      inline: false,
-                    }
-                  )
-                  .setTimestamp();
-
-                if (finalizationDescription) {
-                  dmFinalizeEmbed.addFields({
-                    name: "Descrição Adicional",
-                    value: finalizationDescription,
-                    inline: false,
-                  });
-                }
-
-                await ticketOpener.send({ embeds: [dmFinalizeEmbed] });
-                await currentChannel.send(
-                  `✅ Ticket finalizado por ${staffMember}. Uma DM de notificação foi enviada para o criador do ticket.`
-                );
-                logInfo(`DM de finalização enviada para ${ticketOpener.tag}.`);
-              }
-            } catch (error) {
-              logError(
-                `Erro ao enviar DM de finalização para o usuário (${ticketOpenerId}):`,
-                error
-              );
-              if (error.code === 50007) {
-                await currentChannel.send(
-                  `⚠️ **Atenção:** Não foi possível enviar uma DM para o criador do ticket (<@${ticketOpenerId}>), pois ele pode ter DMs desativadas.`
-                );
-              } else {
-                await currentChannel.send(
-                  `⚠️ **Atenção:** O ticket foi finalizado, mas houve um erro ao enviar a DM de notificação para o criador do ticket.`
-                );
-              }
-            }
-          } else {
-            await currentChannel.send(
-              `✅ Ticket finalizado por ${staffMember}. Não foi possível identificar o criador do ticket para enviar a notificação por DM.`
-            );
           }
 
           if (ticketOpenerId) {
@@ -1696,7 +1631,7 @@ module.exports = {
           await interaction.editReply({
             content:
               "Ticket finalizado com sucesso! O canal será fechado em breve.",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
           setTimeout(async () => {
             await currentChannel.delete();
@@ -1707,20 +1642,20 @@ module.exports = {
             await interaction.reply({
               content:
                 "Ocorreu um erro ao finalizar o ticket. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             await interaction.editReply({
               content:
                 "Ocorreu um erro ao finalizar o ticket. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
         }
       } else if (interaction.customId === "ban_notification_modal") {
         try {
           logInfo(`Tentando deferir a resposta do modal de banimento...`);
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
           logInfo(`Resposta do modal de banimento deferida.`);
 
           const nameInGame =
@@ -1740,7 +1675,7 @@ module.exports = {
             await interaction.editReply({
               content:
                 "Erro: Canal de logs de banimento não configurado (BAN_LOG_CHANNEL_ID no .env).",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
@@ -1752,7 +1687,7 @@ module.exports = {
             await interaction.editReply({
               content:
                 "Erro: Canal de logs de banimento inválido ou não é um canal de texto.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
             return;
           }
@@ -1802,7 +1737,7 @@ module.exports = {
           await interaction.editReply({
             content:
               "Notificação de banimento enviada com sucesso para o canal de logs!",
-            ephemeral: true,
+            flags: [MessageFlags.Ephemeral],
           });
 
           if (targetDiscordUser) {
@@ -1827,7 +1762,7 @@ module.exports = {
               await targetDiscordUser.send({ embeds: [dmEmbed] });
               await interaction.followUp({
                 content: `✅ Notificação de banimento enviada via DM para ${targetDiscordUser.tag}.`,
-                ephemeral: true,
+                flags: [MessageFlags.Ephemeral],
               });
             } catch (dmError) {
               logError(
@@ -1837,12 +1772,12 @@ module.exports = {
               if (dmError.code === 50007) {
                 await interaction.followUp({
                   content: `⚠️ Não foi possível enviar a DM de notificação para ${targetDiscordUser.tag} (provavelmente DMs desativadas).`,
-                  ephemeral: true,
+                  flags: [MessageFlags.Ephemeral],
                 });
               } else {
                 await interaction.followUp({
                   content: `⚠️ Erro ao enviar a DM de notificação para ${targetDiscordUser.tag}.`,
-                  ephemeral: true,
+                  flags: [MessageFlags.Ephemeral],
                 });
               }
             }
@@ -1856,13 +1791,13 @@ module.exports = {
             await interaction.reply({
               content:
                 "Ocorreu um erro ao processar seu formulário de banimento. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           } else {
             await interaction.editReply({
               content:
                 "Ocorreu um erro ao processar seu formulário de banimento. Por favor, tente novamente.",
-              ephemeral: true,
+              flags: [MessageFlags.Ephemeral],
             });
           }
         }
